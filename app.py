@@ -9,23 +9,19 @@ Then open http://localhost:5000 in your browser.
 """
 
 import logging
-import os
-import sys
 import threading
 
 from flask import Flask, jsonify, request, send_from_directory
 
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-
-from aldi_scraper import (
+from scrapers.aldi import (
     DEFAULT_SHOP_ID,
     DEFAULT_ZONE_ID,
     DEFAULT_ZIP,
     AldiSession,
     find_products as aldi_find,
 )
-from walmart_scraper_copy import scrape_search as walmart_search
-from unit_price import standardize_results as standardize_unit_prices
+from scrapers.walmart import scrape_search as walmart_search, find_stores_by_zip
+from pricing import standardize_results as standardize_unit_prices
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 log = logging.getLogger(__name__)
@@ -48,6 +44,41 @@ def get_aldi_session() -> AldiSession:
 @app.route("/")
 def index():
     return send_from_directory(".", "index.html")
+
+
+@app.route("/api/reverse-geocode")
+def api_reverse_geocode():
+    """Proxy reverse geocode to avoid browser CORS/header restrictions."""
+    lat = request.args.get("lat", "").strip()
+    lon = request.args.get("lon", "").strip()
+    if not lat or not lon:
+        return jsonify({"error": "lat and lon required"}), 400
+    try:
+        import requests as _req
+        resp = _req.get(
+            f"https://nominatim.openstreetmap.org/reverse?lat={lat}&lon={lon}&format=json",
+            headers={"User-Agent": "GroceryPriceComparer/1.0"},
+            timeout=5,
+        )
+        data = resp.json()
+        postcode = data.get("address", {}).get("postcode", "")
+        return jsonify({"zip": postcode[:5] if postcode else ""})
+    except Exception as e:
+        log.error(f"Reverse geocode error: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/stores")
+def api_stores():
+    zip_code = request.args.get("zip", "").strip()
+    if not zip_code:
+        return jsonify({"error": "No zip provided"}), 400
+    try:
+        stores = find_stores_by_zip(zip_code)
+        return jsonify({"stores": stores})
+    except Exception as e:
+        log.error(f"Store lookup error: {e}")
+        return jsonify({"error": str(e)}), 500
 
 
 @app.route("/api/search")
@@ -77,7 +108,8 @@ def api_search():
 
     if "walmart" in stores:
         try:
-            raw = walmart_search(query=q, zip_code=zip_code)
+            store_id = request.args.get("store_id", "").strip() or None
+            raw = walmart_search(query=q, zip_code=zip_code, store_id=store_id)
             # Sponsored items go last; cap after sorting
             raw.sort(key=lambda p: bool(p.get("sponsored")))
             raw = raw[:limit]

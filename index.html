@@ -315,6 +315,14 @@
         <input type="checkbox" id="chkWalmart"> Walmart
       </label>
     </div>
+    <div class="header-field">
+      <label for="storeSelect">Store:</label>
+      <select id="storeSelect" style="padding:4px 8px;border-radius:6px;border:none;font-size:.82rem;max-width:220px;">
+        <option value="">Enter zip to load stores</option>
+      </select>
+      <button class="btn btn-sm btn-ghost" style="font-size:.75rem;padding:4px 8px;background:rgba(255,255,255,.15);color:#fff;"
+              onclick="useMyLocation()" title="Use my location">📍</button>
+    </div>
   </div>
 </header>
 
@@ -422,6 +430,94 @@
     return document.getElementById('zipInput').value.trim() || '32825';
   }
 
+  function getStoreId() {
+    return document.getElementById('storeSelect').value || null;
+  }
+
+  // ── Store selector ──────────────────────────────────────
+  let storeLoadTimeout = null;
+
+  document.getElementById('zipInput').addEventListener('input', () => {
+    clearTimeout(storeLoadTimeout);
+    const z = zip();
+    if (z.length === 5) {
+      storeLoadTimeout = setTimeout(() => loadStores(z), 400);
+    }
+  });
+
+  async function loadStores(zipCode) {
+    const sel = document.getElementById('storeSelect');
+    sel.innerHTML = '<option value="">Loading stores...</option>';
+    try {
+      const resp = await fetch(`/api/stores?zip=${encodeURIComponent(zipCode)}`);
+      const data = await resp.json();
+      if (data.error || !data.stores || !data.stores.length) {
+        sel.innerHTML = '<option value="">No stores found</option>';
+        return;
+      }
+      sel.innerHTML = data.stores.slice(0, 8).map(s => {
+        const dist = s.distance != null ? ` (${s.distance} mi)` : '';
+        return `<option value="${esc(s.id)}">${esc(s.displayName)}${dist}</option>`;
+      }).join('');
+      // Restore previously selected store, otherwise first is auto-selected
+      const saved = localStorage.getItem('selectedStoreId');
+      if (saved && sel.querySelector(`option[value="${saved}"]`)) {
+        sel.value = saved;
+      }
+      refreshResults();
+    } catch (e) {
+      sel.innerHTML = '<option value="">Error loading stores</option>';
+    }
+  }
+
+  document.getElementById('storeSelect').addEventListener('change', () => {
+    const id = getStoreId();
+    if (id) localStorage.setItem('selectedStoreId', id);
+    else localStorage.removeItem('selectedStoreId');
+    refreshResults();
+  });
+
+  async function refreshResults() {
+    const queries = Object.keys(state.results);
+    if (!queries.length) return;
+    for (const q of queries) {
+      await doSearch(q);
+    }
+  }
+
+  async function useMyLocation() {
+    if (!navigator.geolocation) { alert('Geolocation not supported'); return; }
+    const btn = document.querySelector('[onclick="useMyLocation()"]');
+    if (btn) btn.textContent = '...';
+    navigator.geolocation.getCurrentPosition(async (pos) => {
+      try {
+        const resp = await fetch(
+          `/api/reverse-geocode?lat=${pos.coords.latitude}&lon=${pos.coords.longitude}`
+        );
+        const data = await resp.json();
+        if (data.zip) {
+          document.getElementById('zipInput').value = data.zip;
+          loadStores(data.zip);
+        } else {
+          alert('Could not determine zip from location');
+        }
+      } catch (e) {
+        alert('Could not determine zip from location');
+      } finally {
+        if (btn) btn.textContent = '📍';
+      }
+    }, (err) => {
+      alert('Location access denied');
+      if (btn) btn.textContent = '📍';
+    });
+  }
+
+  // Load stores on page load
+  (() => {
+    const z = zip();
+    if (z.length === 5) loadStores(z);
+  })();
+
   // ── Search ─────────────────────────────────────────────
   async function doSearch(query) {
     query = (query ?? document.getElementById('searchInput').value).trim();
@@ -435,7 +531,8 @@
     renderQueryBlock(query, null); // loading state
 
     try {
-      const url = `/api/search?q=${encodeURIComponent(query)}&stores=${stores.join(',')}&zip=${zip()}&limit=12`;
+      const sid = getStoreId();
+      const url = `/api/search?q=${encodeURIComponent(query)}&stores=${stores.join(',')}&zip=${zip()}&limit=12${sid ? '&store_id=' + encodeURIComponent(sid) : ''}`;
       const resp = await fetch(url);
       const data = await resp.json();
 

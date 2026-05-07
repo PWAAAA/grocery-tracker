@@ -3,8 +3,9 @@
 !.gitignore
 !app.py
 !index.html
-!aldi_scraper.py
-!unit_price.py
-!walmart_scraper_copy.py
+!scrapers/
+!scrapers/**
+!pricing/
+!pricing/**
 !README.md
 !LICENSE
