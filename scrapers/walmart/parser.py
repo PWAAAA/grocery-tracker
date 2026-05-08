@@ -167,6 +167,7 @@ def parse_search_results(data: dict) -> list[dict]:
             .isSponsoredFlag    — True for sponsored/ad placements
     """
     results = []
+    seen_ids = set()
     try:
         stacks = data["props"]["pageProps"]["initialData"]["searchResult"]["itemStacks"]
     except (KeyError, TypeError) as e:
@@ -183,12 +184,23 @@ def parse_search_results(data: dict) -> list[dict]:
                 if item.get("__typename") != "Product":
                     continue
                 pid = item.get("usItemId", "")
+                if pid in seen_ids:
+                    continue
+                seen_ids.add(pid)
                 price_info = item.get("priceInfo")
                 if not isinstance(price_info, dict):
                     price_info = {}
                 unit_price_string = price_info.get("unitPrice") or None
                 if not isinstance(unit_price_string, str):
                     unit_price_string = None
+
+                # Determine if the item is available in-store (pickup)
+                # vs shipping-only. fulfillmentBadgeGroups contains badges
+                # like FF_PICKUP (in-store) or FF_SHIPPING (ship-to-home).
+                badge_groups = item.get("fulfillmentBadgeGroups") or []
+                badge_keys = {bg.get("key") for bg in badge_groups if isinstance(bg, dict)}
+                in_store = "FF_PICKUP" in badge_keys
+
                 results.append({
                     "name": item.get("name"),
                     "product_id": pid,
@@ -198,6 +210,7 @@ def parse_search_results(data: dict) -> list[dict]:
                     "image": item.get("image"),
                     "url": f"https://www.walmart.com/ip/{pid}",
                     "sponsored": item.get("isSponsoredFlag", False),
+                    "in_store": in_store,
                 })
             except Exception as e:
                 log.warning(f"Skipping malformed search item: {e}")

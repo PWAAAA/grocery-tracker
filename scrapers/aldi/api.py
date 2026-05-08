@@ -116,7 +116,14 @@ def extract_id_from_url(url: str) -> Optional[str]:
 
     Handles:
         https://www.aldi.us/store/aldi/products/16902710-friendly-farms-vitamin-d-milk-1-gal
-        -> "16902710"
+        https://www.aldi.us/product/friendly-farms-1-milk-1-gal-0000000000001754
     """
+    # Format 1: /products/{id}-{slug}
     match = re.search(r'/products/(\d+)', url)
-    return match.group(1) if match else None
+    if match:
+        return match.group(1)
+    # Format 2: /product/{slug}-{id}  (ID is trailing digits at end of path)
+    match = re.search(r'/product/.*?-(\d{7,})(?:\?|$)', url)
+    if match:
+        return match.group(1)
+    return None

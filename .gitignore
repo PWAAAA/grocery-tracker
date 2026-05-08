@@ -8,5 +8,6 @@ __pycache__/
 !scrapers/**
 !pricing/
 !pricing/**
+!grocery_list.txt
 !README.md
 !LICENSE
