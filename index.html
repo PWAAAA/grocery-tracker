@@ -96,33 +96,82 @@
     }
     .search-row input:focus { border-color: var(--primary); }
 
-    /* ── Grocery list ─────────────────────────────────────── */
-    .grocery-section { margin-top: 12px; }
-    .grocery-section summary {
-      cursor: pointer; font-size: .82rem; font-weight: 600;
-      color: var(--muted); list-style: none; display: flex; align-items: center; gap: 6px;
-    }
-    .grocery-section summary::before { content: '▶'; font-size: .65rem; }
-    details[open] .grocery-section summary::before { content: '▼'; }
+    /* ── Grocery list modal ────────────────────────────────── */
+    .grocery-btn { margin-top: 10px; }
 
-    .grocery-tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0 10px; }
-    .grocery-tag {
-      background: #eff6ff; border: 1px solid #bfdbfe; color: var(--primary);
-      border-radius: 999px; padding: 3px 10px; font-size: .78rem;
-      display: flex; align-items: center; gap: 6px;
+    .grocery-overlay {
+      display: none; position: fixed; inset: 0; z-index: 200;
+      background: rgba(0,0,0,.35); align-items: center; justify-content: center;
     }
-    .grocery-tag span { cursor: pointer; }
-    .grocery-tag span:hover { text-decoration: underline; }
-    .grocery-tag button {
+    .grocery-overlay.open { display: flex; }
+
+    .grocery-modal {
+      background: var(--card); border-radius: 14px; width: 420px; max-width: 95vw;
+      max-height: 70vh; display: flex; flex-direction: column;
+      box-shadow: 0 12px 40px rgba(0,0,0,.2);
+    }
+    .grocery-modal-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 14px 18px; border-bottom: 1px solid var(--border); flex-shrink: 0;
+    }
+    .grocery-modal-header h3 { font-size: .95rem; font-weight: 700; }
+    .grocery-modal-close {
+      background: none; border: none; cursor: pointer; font-size: 1.3rem;
+      color: var(--muted); line-height: 1; padding: 0 2px;
+    }
+    .grocery-modal-close:hover { color: var(--danger); }
+
+    .grocery-modal-body {
+      flex: 1; overflow-y: auto; padding: 8px 0;
+    }
+    .grocery-modal-body .grocery-empty {
+      text-align: center; color: var(--muted); padding: 28px 16px; font-size: .82rem;
+    }
+
+    .grocery-item {
+      display: flex; align-items: center; gap: 8px;
+      padding: 7px 18px; font-size: .82rem;
+    }
+    .grocery-item:hover { background: #f8fafc; }
+    .grocery-item .gi-type {
+      font-size: .65rem; font-weight: 700; text-transform: uppercase;
+      padding: 2px 6px; border-radius: 4px; flex-shrink: 0;
+    }
+    .grocery-item .gi-type.search { background: #eff6ff; color: var(--primary); }
+    .grocery-item .gi-type.link   { background: #f0fdf4; color: var(--success); }
+    .grocery-item .gi-label {
+      flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+      cursor: pointer;
+    }
+    .grocery-item .gi-label:hover { text-decoration: underline; }
+    .grocery-item .gi-remove {
       background: none; border: none; cursor: pointer; color: var(--muted);
-      font-size: 1rem; line-height: 1; padding: 0; display: flex; align-items: center;
+      font-size: 1rem; line-height: 1; padding: 0 2px; flex-shrink: 0;
     }
-    .grocery-tag button:hover { color: var(--danger); }
+    .grocery-item .gi-remove:hover { color: var(--danger); }
 
-    .grocery-add { display: flex; gap: 6px; }
-    .grocery-add input {
-      flex: 1; padding: 6px 10px; border: 1px solid var(--border);
-      border-radius: 6px; font-size: .82rem;
+    .grocery-modal-footer {
+      padding: 12px 18px; border-top: 1px solid var(--border); flex-shrink: 0;
+      display: flex; flex-direction: column; gap: 8px;
+    }
+    .grocery-modal-footer .gf-add-row { display: flex; gap: 6px; }
+    .grocery-modal-footer .gf-add-row input {
+      flex: 1; padding: 7px 10px; border: 1px solid var(--border);
+      border-radius: 6px; font-size: .82rem; min-width: 0; outline: none;
+    }
+    .grocery-modal-footer .gf-add-row input:focus { border-color: var(--primary); }
+    .grocery-modal-footer .gf-actions { display: flex; gap: 6px; }
+
+    /* ── "+ List" button on product rows & headers ────────── */
+    .btn-list {
+      background: none; border: 1px solid var(--border); border-radius: 6px;
+      cursor: pointer; font-size: .72rem; font-weight: 600; color: var(--muted);
+      padding: 4px 8px; white-space: nowrap; transition: all .15s;
+    }
+    .btn-list:hover { background: #f0fdf4; border-color: #86efac; color: var(--success); }
+
+    .load-links-status {
+      font-size: .78rem; color: var(--muted); padding: 6px 0;
     }
 
     /* ── Results ──────────────────────────────────────────── */
@@ -145,18 +194,20 @@
     .results-group.collapsed .results-group-body   { display: none; }
     .toggle-arrow { font-size: .6rem; transition: transform .15s; flex-shrink: 0; }
     .results-group.collapsed .toggle-arrow { transform: rotate(-90deg); }
-    .results-group-header button {
-      margin-left: auto; background: none; border: none; cursor: pointer;
+    .results-group-header > button:not(.btn-list) {
+      background: none; border: none; cursor: pointer;
       color: var(--muted); font-size: .75rem;
     }
-    .results-group-header button:hover { color: var(--danger); }
+    .results-group-header > button:not(.btn-list):hover { color: var(--danger); }
+    .results-group-header .btn-list { margin-left: auto; }
+    .results-group-header .btn-list + button { margin-left: 6px; }
     .unit-toggle {
       margin-left: auto; font-size: .7rem; padding: 2px 6px;
       border: 1px solid var(--border); border-radius: 4px;
       background: #fff; color: var(--muted); cursor: pointer;
       text-transform: none; letter-spacing: 0;
     }
-    .unit-toggle + button { margin-left: 8px; }
+    .unit-toggle ~ .btn-list { margin-left: 8px; }
 
     .product-row {
       display: flex; align-items: center; gap: 10px;
@@ -295,6 +346,127 @@
       background: #fef2f2; border: 1px solid #fecaca; color: var(--danger);
       border-radius: 8px; padding: 10px 14px; font-size: .82rem;
     }
+
+    /* ── Mobile cart bar (hidden on desktop) ────────────── */
+    .cart-bar {
+      display: none;
+    }
+    .cart-close {
+      display: none;
+    }
+
+    /* ── Mobile responsive ──────────────────────────────── */
+    @media (max-width: 768px) {
+      header {
+        height: auto;
+        min-height: var(--header-h);
+        flex-wrap: wrap;
+        gap: 8px;
+        padding: 10px 14px;
+      }
+      .header-controls {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+        width: 100%;
+      }
+      .header-field { width: 100%; }
+      .header-field select { flex: 1; min-width: 0; }
+
+      body {
+        overflow: auto;
+        height: auto;
+        min-height: 100vh;
+        padding-bottom: 56px; /* space for cart bar */
+      }
+
+      .body {
+        grid-template-columns: 1fr;
+        overflow: visible;
+      }
+
+      .main {
+        overflow-y: visible;
+        padding: 12px 10px;
+      }
+
+      /* Hide cart panel by default on mobile */
+      .cart-panel {
+        display: none;
+      }
+
+      /* Cart overlay when open */
+      body.cart-open .cart-panel {
+        display: flex;
+        position: fixed;
+        inset: 0;
+        z-index: 100;
+        border-left: none;
+      }
+      body.cart-open .cart-bar {
+        display: none;
+      }
+
+      .cart-close {
+        display: none;
+        background: none;
+        border: none;
+        font-size: 1.5rem;
+        cursor: pointer;
+        color: var(--muted);
+        line-height: 1;
+        padding: 0 4px;
+      }
+      body.cart-open .cart-close {
+        display: block;
+      }
+
+      /* Sticky bottom cart bar */
+      .cart-bar {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        height: 52px;
+        background: var(--primary);
+        color: #fff;
+        font-size: .95rem;
+        font-weight: 600;
+        cursor: pointer;
+        z-index: 50;
+        box-shadow: 0 -2px 8px rgba(0,0,0,.15);
+        user-select: none;
+      }
+
+      /* Product rows: smaller images */
+      .product-row-img,
+      .product-row-img-ph {
+        width: 40px;
+        height: 40px;
+      }
+
+      /* Comparison cards: stack vertically */
+      .comp-items {
+        flex-direction: column;
+      }
+      .comp-item {
+        min-width: 0;
+      }
+
+      .search-row input {
+        min-width: 0;
+      }
+
+      /* Grocery modal: near full-width on mobile */
+      .grocery-modal {
+        width: 95vw;
+        max-height: 80vh;
+      }
+    }
   </style>
 </head>
 <body>
@@ -312,8 +484,16 @@
         <input type="checkbox" id="chkAldi" checked> Aldi
       </label>
       <label class="store-toggle">
-        <input type="checkbox" id="chkWalmart"> Walmart
+        <input type="checkbox" id="chkWalmart" checked> Walmart
       </label>
+    </div>
+    <div class="header-field">
+      <label for="storeSelect">Store:</label>
+      <select id="storeSelect" style="padding:4px 8px;border-radius:6px;border:none;font-size:.82rem;max-width:220px;">
+        <option value="">Enter zip to load stores</option>
+      </select>
+      <button class="btn btn-sm btn-ghost" style="font-size:.75rem;padding:4px 8px;background:rgba(255,255,255,.15);color:#fff;"
+              onclick="useMyLocation()" title="Use my location">📍</button>
     </div>
   </div>
 </header>
@@ -332,17 +512,8 @@
         <button class="btn btn-primary" onclick="doSearch()">Search</button>
       </div>
 
-      <!-- Grocery list -->
-      <details class="grocery-section" id="groceryDetails">
-        <summary id="grocerySummary">Grocery List</summary>
-        <div class="grocery-tags" id="groceryTags"></div>
-        <div class="grocery-add">
-          <input type="text" id="groceryInput" placeholder="Add item…"
-                 onkeydown="if(event.key==='Enter') addToList()">
-          <button class="btn btn-sm btn-primary" onclick="addToList()">+ Add</button>
-          <button class="btn btn-sm btn-ghost" onclick="searchAll()">Search All</button>
-        </div>
-      </details>
+      <!-- Grocery list button -->
+      <button class="btn btn-sm btn-ghost grocery-btn" id="groceryBtn" onclick="toggleGroceryModal()">Grocery List</button>
     </div>
 
     <!-- Results (one block per search query) -->
@@ -361,6 +532,11 @@
     <div class="cart-header">
       <h2>Cart</h2>
       <button class="btn btn-sm btn-ghost" style="color:var(--danger)" onclick="clearCart()">Clear</button>
+      <button class="cart-close" onclick="toggleMobileCart()" title="Close cart">&times;</button>
+    </div>
+    <div style="padding:4px 16px 0;">
+      <button class="btn btn-sm btn-ghost" style="font-size:.72rem;padding:3px 8px;" onclick="loadLinks()">Use Grocery List</button>
+      <span class="load-links-status" id="loadLinksStatus"></span>
     </div>
     <div class="cart-items" id="cartItems">
       <div class="empty-cart">Your cart is empty.<br>Search for products and tap <strong>+ Add</strong>.</div>
@@ -375,13 +551,41 @@
 
 </div>
 
+<!-- ── Mobile cart bar ── -->
+<div class="cart-bar" onclick="toggleMobileCart()">
+  🛒 Cart (<span id="cartBarCount">0</span>) — <span id="cartBarTotal">$0.00</span>
+</div>
+
+<!-- ── Grocery list modal ── -->
+<div class="grocery-overlay" id="groceryOverlay" onclick="if(event.target===this)toggleGroceryModal()">
+  <div class="grocery-modal">
+    <div class="grocery-modal-header">
+      <h3>Grocery List</h3>
+      <button class="grocery-modal-close" onclick="toggleGroceryModal()">&times;</button>
+    </div>
+    <div class="grocery-modal-body" id="groceryModalBody">
+      <div class="grocery-empty">No items yet.</div>
+    </div>
+    <div class="grocery-modal-footer">
+      <div class="gf-add-row">
+        <input type="text" id="groceryInput" placeholder="Add item or paste a link…"
+               onkeydown="if(event.key==='Enter') addToList()">
+        <button class="btn btn-sm btn-primary" onclick="addToList()">+ Add</button>
+      </div>
+      <div class="gf-actions">
+        <button class="btn btn-sm btn-ghost" onclick="searchAll()">Search All Terms</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- ═══════════════════ SCRIPT ═══════════════════ -->
 <script>
   // ── State ──────────────────────────────────────────────
   const state = {
     results: {},    // { query: [ ...products ] }
     cart: [],       // [ { ...product, quantity, searchQuery } ]
-    grocery: [],    // [ query strings ]
+    grocery: [],    // [ { type: 'link'|'search', store?: string, value: string } ]
     unitMeta: {},   // { query: { default, options, container_label, selected } }
   };
 
@@ -422,6 +626,94 @@
     return document.getElementById('zipInput').value.trim() || '32825';
   }
 
+  function getStoreId() {
+    return document.getElementById('storeSelect').value || null;
+  }
+
+  // ── Store selector ──────────────────────────────────────
+  let storeLoadTimeout = null;
+
+  document.getElementById('zipInput').addEventListener('input', () => {
+    clearTimeout(storeLoadTimeout);
+    const z = zip();
+    if (z.length === 5) {
+      storeLoadTimeout = setTimeout(() => loadStores(z), 400);
+    }
+  });
+
+  async function loadStores(zipCode) {
+    const sel = document.getElementById('storeSelect');
+    sel.innerHTML = '<option value="">Loading stores...</option>';
+    try {
+      const resp = await fetch(`/api/stores?zip=${encodeURIComponent(zipCode)}`);
+      const data = await resp.json();
+      if (data.error || !data.stores || !data.stores.length) {
+        sel.innerHTML = '<option value="">No stores found</option>';
+        return;
+      }
+      sel.innerHTML = data.stores.slice(0, 8).map(s => {
+        const dist = s.distance != null ? ` (${s.distance} mi)` : '';
+        return `<option value="${esc(s.id)}">${esc(s.displayName)}${dist}</option>`;
+      }).join('');
+      // Restore previously selected store, otherwise first is auto-selected
+      const saved = localStorage.getItem('selectedStoreId');
+      if (saved && sel.querySelector(`option[value="${saved}"]`)) {
+        sel.value = saved;
+      }
+      refreshResults();
+    } catch (e) {
+      sel.innerHTML = '<option value="">Error loading stores</option>';
+    }
+  }
+
+  document.getElementById('storeSelect').addEventListener('change', () => {
+    const id = getStoreId();
+    if (id) localStorage.setItem('selectedStoreId', id);
+    else localStorage.removeItem('selectedStoreId');
+    refreshResults();
+  });
+
+  async function refreshResults() {
+    const queries = Object.keys(state.results);
+    if (!queries.length) return;
+    for (const q of queries) {
+      await doSearch(q);
+    }
+  }
+
+  async function useMyLocation() {
+    if (!navigator.geolocation) { alert('Geolocation not supported'); return; }
+    const btn = document.querySelector('[onclick="useMyLocation()"]');
+    if (btn) btn.textContent = '...';
+    navigator.geolocation.getCurrentPosition(async (pos) => {
+      try {
+        const resp = await fetch(
+          `/api/reverse-geocode?lat=${pos.coords.latitude}&lon=${pos.coords.longitude}`
+        );
+        const data = await resp.json();
+        if (data.zip) {
+          document.getElementById('zipInput').value = data.zip;
+          loadStores(data.zip);
+        } else {
+          alert('Could not determine zip from location');
+        }
+      } catch (e) {
+        alert('Could not determine zip from location');
+      } finally {
+        if (btn) btn.textContent = '📍';
+      }
+    }, (err) => {
+      alert('Location access denied');
+      if (btn) btn.textContent = '📍';
+    });
+  }
+
+  // Load stores on page load
+  (() => {
+    const z = zip();
+    if (z.length === 5) loadStores(z);
+  })();
+
   // ── Search ─────────────────────────────────────────────
   async function doSearch(query) {
     query = (query ?? document.getElementById('searchInput').value).trim();
@@ -435,7 +727,8 @@
     renderQueryBlock(query, null); // loading state
 
     try {
-      const url = `/api/search?q=${encodeURIComponent(query)}&stores=${stores.join(',')}&zip=${zip()}&limit=12`;
+      const sid = getStoreId();
+      const url = `/api/search?q=${encodeURIComponent(query)}&stores=${stores.join(',')}&zip=${zip()}&limit=12${sid ? '&store_id=' + encodeURIComponent(sid) : ''}`;
       const resp = await fetch(url);
       const data = await resp.json();
 
@@ -497,7 +790,8 @@
         ${unitSelector}
         ${extra}
       </div>`;
-    const removeBtn = `<button onclick="event.stopPropagation(); removeQueryBlock(${jsonAttr(query)})">✕ remove</button>`;
+    const listBtn = `<button class="btn-list" onclick="event.stopPropagation(); addTermToList(${jsonAttr(query)}, event)">+ List</button>`;
+    const removeBtn = `${listBtn}<button onclick="event.stopPropagation(); removeQueryBlock(${jsonAttr(query)})">✕ remove</button>`;
 
     if (payload === null) {
       el.innerHTML = hdr() + `<div class="results-group-body"><div class="spinner">Searching…</div></div>`;
@@ -567,6 +861,8 @@
         <button class="btn btn-primary btn-sm"
           onclick="addToCart(${jsonAttr(query)}, ${idx}, event)"
           ${!p.in_stock ? 'disabled style="opacity:.5"' : ''}>+ Add</button>
+        <button class="btn-list"
+          onclick="addProductToList(${jsonAttr(query)}, ${idx}, event)">+ List</button>
       </div>`;
   }
 
@@ -578,39 +874,189 @@
     if (products) renderQueryBlock(query, { products });
   }
 
-  // ── Grocery list ───────────────────────────────────────
-  function addToList() {
+  // ── Grocery list (persistent, file-backed) ────────────
+  async function loadGroceryList() {
+    try {
+      const resp = await fetch('/api/grocery-list');
+      const data = await resp.json();
+      state.grocery = data.items || [];
+      renderGrocery();
+    } catch (e) {
+      console.error('Failed to load grocery list:', e);
+    }
+  }
+
+  async function saveGroceryList() {
+    const rawItems = state.grocery.map(g => g.value);
+    try {
+      await fetch('/api/grocery-list', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ items: rawItems }),
+      });
+    } catch (e) {
+      console.error('Failed to save grocery list:', e);
+    }
+  }
+
+  function toggleGroceryModal() {
+    document.getElementById('groceryOverlay').classList.toggle('open');
+  }
+
+  function addToList(value) {
     const input = document.getElementById('groceryInput');
-    const val = input.value.trim();
-    if (!val || state.grocery.includes(val)) return;
-    state.grocery.push(val);
-    input.value = '';
+    const val = (value ?? input.value).trim();
+    if (!val) return;
+    if (state.grocery.some(g => g.value === val)) return;
+    const item = val.startsWith('http')
+      ? { type: 'link', store: val.includes('walmart.com') ? 'walmart' : val.includes('aldi.us') ? 'aldi' : 'unknown', value: val }
+      : { type: 'search', value: val };
+    state.grocery.push(item);
+    if (!value) input.value = '';
     renderGrocery();
-    document.getElementById('groceryDetails').open = true;
+    saveGroceryList();
   }
 
   function removeFromList(idx) {
     state.grocery.splice(idx, 1);
     renderGrocery();
+    saveGroceryList();
+  }
+
+  function groceryTagLabel(item) {
+    if (item.type === 'link') {
+      // Show a short readable label from the URL
+      try {
+        const url = new URL(item.value);
+        const parts = url.pathname.split('/').filter(Boolean);
+        // Walmart: /ip/Product-Name/id -> "Product-Name"
+        // Aldi: /product/product-name-id -> "product-name-id"
+        const slug = parts[parts.length - 1] || parts[parts.length - 2] || item.value;
+        return slug.replace(/[-_]/g, ' ').replace(/\d{6,}/, '').trim() || item.value;
+      } catch { return item.value; }
+    }
+    return item.value;
   }
 
   function renderGrocery() {
-    const el = document.getElementById('groceryTags');
-    const summary = document.getElementById('grocerySummary');
-    el.innerHTML = state.grocery.map((item, i) => `
-      <span class="grocery-tag">
-        <span onclick="doSearch('${esc(item)}')" title="Search">${esc(item)}</span>
-        <button onclick="removeFromList(${i})" title="Remove">×</button>
-      </span>
-    `).join('');
-    summary.textContent = `Grocery List${state.grocery.length ? ` (${state.grocery.length})` : ''}`;
+    const body = document.getElementById('groceryModalBody');
+    const btn = document.getElementById('groceryBtn');
+    const count = state.grocery.length;
+
+    if (!count) {
+      body.innerHTML = '<div class="grocery-empty">No items yet.</div>';
+    } else {
+      body.innerHTML = state.grocery.map((item, i) => {
+        const isLink = item.type === 'link';
+        const label = groceryTagLabel(item);
+        const typeLabel = isLink ? item.store : 'search';
+        const action = isLink
+          ? `title="${esc(item.value)}"`
+          : `onclick="doSearch(${jsonAttr(item.value)})" title="Click to search"`;
+        return `
+          <div class="grocery-item">
+            <span class="gi-type ${isLink ? 'link' : 'search'}">${esc(typeLabel)}</span>
+            <span class="gi-label" ${action}>${esc(label)}</span>
+            <button class="gi-remove" onclick="removeFromList(${i})" title="Remove">×</button>
+          </div>`;
+      }).join('');
+    }
+
+    btn.textContent = count ? `Grocery List (${count})` : 'Grocery List';
   }
 
   async function searchAll() {
-    for (const item of state.grocery) {
-      await doSearch(item);
+    const searches = state.grocery.filter(g => g.type === 'search');
+    for (const item of searches) {
+      await doSearch(item.value);
       await new Promise(r => setTimeout(r, 400));
     }
+  }
+
+  async function loadLinks() {
+    const links = state.grocery.filter(g => g.type === 'link').map(g => g.value);
+    if (!links.length) { alert('No links in your grocery list.'); return; }
+
+    const statusEl = document.getElementById('loadLinksStatus');
+    statusEl.textContent = `Loading ${links.length} product${links.length > 1 ? 's' : ''}...`;
+
+    try {
+      const sid = getStoreId();
+      const resp = await fetch('/api/fetch-links', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ links, zip: zip(), store_id: sid }),
+      });
+      const data = await resp.json();
+      const products = data.products || [];
+
+      if (!products.length) {
+        statusEl.textContent = 'No products could be loaded.';
+        return;
+      }
+
+      // Add each product to cart
+      for (const p of products) {
+        const key = `${p.store}::${p.product_id}`;
+        const existing = state.cart.find(c => `${c.store}::${c.product_id}` === key);
+        if (existing) { existing.quantity++; }
+        else { state.cart.push({ ...p, quantity: 1, searchQuery: 'Grocery List' }); }
+      }
+      renderCart();
+      renderComparison();
+      statusEl.textContent = `Loaded ${products.length} product${products.length > 1 ? 's' : ''} into cart.`;
+    } catch (e) {
+      statusEl.textContent = `Error: ${e.message}`;
+    }
+  }
+
+  // Add a product (by URL) to the grocery list from search results
+  function addProductToList(query, idx, evt) {
+    const p = state.results[query]?.[idx];
+    if (!p) return;
+    let url;
+    if (p.store === 'walmart' && p.product_id) {
+      url = `https://www.walmart.com/ip/${p.product_id}`;
+    } else if (p.store === 'aldi' && p.product_id) {
+      url = `https://new.aldi.us/product/${p.product_id}`;
+    }
+    if (!url) return;
+    addToList(url);
+    if (evt) {
+      const btn = evt.currentTarget;
+      btn.textContent = 'Listed';
+      btn.disabled = true;
+      setTimeout(() => { btn.textContent = '+ List'; btn.disabled = false; }, 1200);
+    }
+  }
+
+  // Add a search term to the grocery list from results header
+  function addTermToList(query, evt) {
+    addToList(query);
+    if (evt) {
+      const btn = evt.currentTarget;
+      btn.textContent = 'Listed';
+      btn.disabled = true;
+      setTimeout(() => { btn.textContent = '+ List'; btn.disabled = false; }, 1200);
+    }
+  }
+
+  // Load grocery list on page load
+  loadGroceryList();
+
+  // ── Mobile cart drawer ─────────────────────────────────
+  function toggleMobileCart() {
+    document.body.classList.toggle('cart-open');
+  }
+
+  function updateCartBar() {
+    const countEl = document.getElementById('cartBarCount');
+    const totalEl = document.getElementById('cartBarTotal');
+    if (!countEl || !totalEl) return;
+    const count = state.cart.reduce((s, i) => s + i.quantity, 0);
+    const total = state.cart.reduce((s, i) => s + (i.price ?? 0) * i.quantity, 0);
+    countEl.textContent = count;
+    totalEl.textContent = `$${total.toFixed(2)}`;
   }
 
   // ── Cart ───────────────────────────────────────────────
@@ -693,6 +1139,7 @@
     }).join('');
 
     totalEl.textContent = `$${total.toFixed(2)}`;
+    updateCartBar();
   }
 
   // ── Price comparison ────────────────────────────────────
