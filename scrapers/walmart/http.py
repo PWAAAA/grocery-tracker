@@ -218,6 +218,7 @@ def fetch_page(
                         )
                     return None
 
+            log.info(f"Fetched {len(resp.text)} chars from {url}")
             return resp.text
 
         except Exception as e:

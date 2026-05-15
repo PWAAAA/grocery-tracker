@@ -28,6 +28,7 @@ class WalmartProduct:
     url: str
     brand: Optional[str] = None
     image_url: Optional[str] = None
+    serving_size: Optional[str] = None
     error: Optional[str] = None
 
 
@@ -47,5 +48,6 @@ class AldiProduct:
     store_location: Optional[str]
     url: str
     image_url: Optional[str] = None
+    serving_size: Optional[str] = None
     currency: str = "USD"
     error: Optional[str] = None

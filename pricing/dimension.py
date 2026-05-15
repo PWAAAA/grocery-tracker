@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from collections import Counter
 from typing import Optional
 
@@ -11,13 +12,25 @@ from .parsing import parse_pack_size_combined
 
 def query_dimension_hint(query: str) -> Optional[str]:
     """Look up the query in the keyword map. Returns the matched dimension
-    or None if no keyword matches."""
+    or None if no keyword matches.
+
+    Multi-word keywords (e.g. 'toilet paper') are matched as substrings.
+    Single-word keywords require a word boundary so 'oil' doesn't match 'toilet'.
+    Longer keyword matches take priority over shorter ones.
+    """
     q = (query or "").lower()
+    best: tuple[int, str] | None = None  # (keyword length, dimension)
     for dim, keywords in QUERY_KEYWORDS.items():
         for kw in keywords:
-            if kw in q:
-                return dim
-    return None
+            if " " in kw:
+                if kw in q:
+                    if best is None or len(kw) > best[0]:
+                        best = (len(kw), dim)
+            else:
+                if re.search(rf"\b{re.escape(kw)}", q):
+                    if best is None or len(kw) > best[0]:
+                        best = (len(kw), dim)
+    return best[1] if best else None
 
 
 def product_dimension(

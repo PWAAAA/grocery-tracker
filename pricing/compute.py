@@ -6,6 +6,7 @@ from typing import Optional
 
 from .constants import (
     DIMENSION_DEFAULT,
+    DIMENSION_FILTER,
     DOZEN_MULTIPLIER,
     UNIT_DIMENSION,
     UNIT_OPTION_ORDER,
@@ -14,15 +15,18 @@ from .constants import (
 )
 from .containers import detect_container_label
 from .dimension import pick_dimension, product_dimension
-from .parsing import parse_native_unit_price, parse_pack_size_combined
+from .parsing import parse_native_per_100, parse_native_unit_price, parse_pack_size_combined, parse_priced_per_unit
 
 
 def total_count(pack: list[tuple[float, str]]) -> Optional[float]:
     """Total individual-item count from a parsed pack. None if no count present.
-    Multiplies count terms ('12 Pack, Pack of 2' -> 24)."""
+    Multiplies count terms ('12 Pack, Pack of 2' -> 24).
+    Skips 'sheet' — sheets aren't items you buy individually."""
     qty = 1.0
     has = False
     for q, u in pack:
+        if u == "sheet":
+            continue
         if u == "dozen":
             qty *= q * 12
             has = True
@@ -41,7 +45,7 @@ def total_in_dimension(pack: list[tuple[float, str]], dimension: str) -> Optiona
     """
     count_qty = 1.0
     has_count = False
-    canon_total = 0.0
+    canon_values: list[float] = []
 
     for qty, unit in pack:
         dim = UNIT_DIMENSION.get(unit)
@@ -50,15 +54,24 @@ def total_in_dimension(pack: list[tuple[float, str]], dimension: str) -> Optiona
             count_qty *= qty * multiplier
             has_count = True
         elif dimension == "volume" and unit in VOLUME_TO_FLOZ:
-            canon_total += qty * VOLUME_TO_FLOZ[unit]
+            canon_values.append(qty * VOLUME_TO_FLOZ[unit])
         elif dimension == "weight" and unit in WEIGHT_TO_OZ:
-            canon_total += qty * WEIGHT_TO_OZ[unit]
+            canon_values.append(qty * WEIGHT_TO_OZ[unit])
 
     if dimension == "count":
         return count_qty if has_count else None
 
-    if canon_total == 0:
+    if not canon_values:
         return None
+
+    # Deduplicate near-equivalent entries (same size expressed in different units,
+    # e.g. "1L, 946mL (33.8 fl oz)" — all represent the same volume).
+    if not has_count and len(canon_values) > 1:
+        mn, mx = min(canon_values), max(canon_values)
+        canon_total = mx if (mn > 0 and mx / mn < 1.10) else sum(canon_values)
+    else:
+        canon_total = sum(canon_values)
+
     return canon_total * count_qty if has_count else canon_total
 
 
@@ -81,10 +94,49 @@ def compute_unit_reps(
     if price is None or price <= 0:
         return {}
 
+    # Detect "per lb" / "per oz" style sizes (variable-weight items).
+    # If we have a native unit price string (e.g. "$2.19 / lb"), use that
+    # for the real rate. Otherwise fall back to treating the listed price
+    # as the per-unit rate (for stores that don't provide a separate rate).
+    priced_per = parse_priced_per_unit(size)
+    native = parse_native_unit_price(native_unit_price)
+    if priced_per:
+        out: dict[str, dict] = {}
+        if native and native[1] in WEIGHT_TO_OZ:
+            per_oz = native[0] / WEIGHT_TO_OZ[native[1]]
+            per_lb = per_oz * 16
+            out["per_oz"] = {"value": per_oz, "string": _fmt_money_per(per_oz, "oz")}
+            out["per_lb"] = {"value": per_lb, "string": f"${per_lb:.2f}/lb"}
+        elif native and native[1] in VOLUME_TO_FLOZ:
+            per_floz = native[0] / VOLUME_TO_FLOZ[native[1]]
+            per_gal = per_floz * 128
+            out["per_fl_oz"] = {"value": per_floz, "string": _fmt_money_per(per_floz, "fl oz")}
+            out["per_gal"] = {"value": per_gal, "string": f"${per_gal:.2f}/gal"}
+        elif priced_per in WEIGHT_TO_OZ:
+            per_oz = price / WEIGHT_TO_OZ[priced_per]
+            per_lb = per_oz * 16
+            out["per_oz"] = {"value": per_oz, "string": _fmt_money_per(per_oz, "oz")}
+            out["per_lb"] = {"value": per_lb, "string": f"${per_lb:.2f}/lb"}
+        elif priced_per in VOLUME_TO_FLOZ:
+            per_floz = price / VOLUME_TO_FLOZ[priced_per]
+            per_gal = per_floz * 128
+            out["per_fl_oz"] = {"value": per_floz, "string": _fmt_money_per(per_floz, "fl oz")}
+            out["per_gal"] = {"value": per_gal, "string": f"${per_gal:.2f}/gal"}
+        elif priced_per == "each":
+            out["per_ea"] = {"value": price, "string": f"${price:.2f}/{container_label}"}
+        return out
+
     pack = parse_pack_size_combined(name, size)
     native = parse_native_unit_price(native_unit_price)
 
-    prod_dim = product_dimension(name, size) or dimension
+    prod_dim = product_dimension(name, size)
+    # When query says "volume" but product detected "weight" only from bare "oz",
+    # prefer query hint — bare "oz" is ambiguous (could be fl oz for liquids).
+    if prod_dim == "weight" and dimension == "volume":
+        pack_units = {u for _, u in pack}
+        if pack_units <= {"ounce", "count", "pack", "dozen", "sheet"}:
+            prod_dim = dimension
+    prod_dim = prod_dim or dimension
 
     # Disambiguate bare "oz": when this product is a volume product,
     # "7.5 oz" should be read as fluid ounces, not weight ounces.
@@ -107,6 +159,18 @@ def compute_unit_reps(
         per_ea = native[0]
         out["per_ea"] = {"value": per_ea, "string": f"${per_ea:.2f}/{container_label}"}
         out["per_dozen"] = {"value": per_ea * 12, "string": f"${per_ea * 12:.2f}/dozen"}
+
+    # --- per 100 ct (sheets, napkins, etc.) ---
+    per_100 = parse_native_per_100(native_unit_price)
+    if per_100 is not None:
+        out["per_100_ct"] = {"value": per_100, "string": _fmt_money_per(per_100, "100 ct")}
+    elif count and count > 0:
+        sheet_qty = sum(q for q, u in pack if u == "sheet")
+        if sheet_qty > 0:
+            non_sheet_count = total_count([(q, u) for q, u in pack if u != "sheet"])
+            total_sheets = sheet_qty * (non_sheet_count or 1)
+            per_100_val = price / total_sheets * 100
+            out["per_100_ct"] = {"value": per_100_val, "string": _fmt_money_per(per_100_val, "100 ct")}
 
     # --- volume ---
     # Prefer price/size over native unit price to avoid rounding errors
@@ -173,7 +237,8 @@ def standardize_results(query: str, products: list[dict]) -> dict:
     default = DIMENSION_DEFAULT.get(dimension or "")
     if default not in available:
         default = next((k for k in UNIT_OPTION_ORDER if k in available), None)
-    options = [k for k in UNIT_OPTION_ORDER if k in available]
+    allowed = DIMENSION_FILTER.get(dimension or "")
+    options = [k for k in UNIT_OPTION_ORDER if k in available and (allowed is None or k in allowed)]
 
     return {
         "unit_default": default,

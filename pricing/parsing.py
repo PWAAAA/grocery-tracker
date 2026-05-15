@@ -8,6 +8,14 @@ from typing import Optional
 
 # Matches "12 ct", "1 gallon", "16 fl oz", "1.5 L", "5.3 oz", etc.
 _NUM = r"(\d+(?:\.\d+)?)"
+# Strips weight/volume ranges like "4.7-6.1 lb" or "2.75 - 4.0 lb" before
+# the main regex runs, so variable-weight products don't get a bogus size.
+_RANGE_RE = re.compile(
+    r"\d+(?:\.\d+)?\s*-\s*\d+(?:\.\d+)?\s*"
+    r"(?:fl\.?\s*oz|floz|gallons?|gal|liters?|litres?|l|milliliters?|ml"
+    r"|quarts?|qt|pints?|pt|pounds?|lbs?|kilograms?|kg|grams?|g|ounces?|oz)\b",
+    re.IGNORECASE,
+)
 SIZE_RE = re.compile(
     rf"{_NUM}\s*-?\s*("
     r"fl\.?\s*oz|floz"
@@ -23,6 +31,7 @@ SIZE_RE = re.compile(
     r"|counts?|ct"
     r"|packs?|pk"
     r"|dozen|dz"
+    r"|sheets?"
     r")\b",
     re.IGNORECASE,
 )
@@ -42,6 +51,7 @@ UNIT_ALIASES: dict[str, str] = {
     "count": "count", "counts": "count", "ct": "count",
     "pack": "pack", "packs": "pack", "pk": "pack",
     "dozen": "dozen", "dz": "dozen",
+    "sheet": "sheet", "sheets": "sheet",
 }
 
 
@@ -56,11 +66,16 @@ def parse_pack_size(name: Optional[str]) -> list[tuple[float, str]]:
     A name like "Coca-Cola, 12 pack 12 fl oz Cans" returns
     [(12.0, "pack"), (12.0, "fl oz")] — the caller decides what to do
     with multiple units (multipack inference).
+
+    Ranges like "4.7-6.1 lb" are stripped first — they indicate
+    variable-weight products, not a fixed pack size.
     """
     if not name:
         return []
+    # Remove ranges before matching so "4.7-6.1 lb" doesn't parse as "6.1 lb"
+    cleaned = _RANGE_RE.sub("", name)
     out: list[tuple[float, str]] = []
-    for qty_s, unit_raw in SIZE_RE.findall(name):
+    for qty_s, unit_raw in SIZE_RE.findall(cleaned):
         unit = _normalize_unit(unit_raw)
         if unit is None:
             continue
@@ -134,3 +149,50 @@ def parse_native_unit_price(s: Optional[str]) -> Optional[tuple[float, str]]:
     if unit is None:
         return None
     return value, unit
+
+
+# ===== "Priced per unit" detection =====
+# Some stores (Aldi) mark variable-weight items with size="per lb" instead
+# of a concrete weight.  The listed price IS the per-unit rate, not a total.
+_PRICED_PER_RE = re.compile(
+    r"^(?:priced\s+)?per\s+"
+    r"(fl\.?\s*oz|floz|gallon|gal|liter|litre|l|ml|"
+    r"pound|lbs?|kilogram|kg|gram|g|ounce|oz|each|ea)\s*$",
+    re.IGNORECASE,
+)
+
+
+_PER_100_RE = re.compile(
+    r"(?P<currency>\$)?\s*(?P<value>\d+(?:\.\d+)?)\s*(?P<cents>¢)?\s*/\s*100\s*(?:ct|count|sheets?)\b",
+    re.IGNORECASE,
+)
+
+
+def parse_native_per_100(s: Optional[str]) -> Optional[float]:
+    """Parse '$1.06/100 ct' native prices. Returns the dollar value per 100."""
+    if not s:
+        return None
+    m = _PER_100_RE.search(s)
+    if not m:
+        return None
+    try:
+        value = float(m.group("value"))
+    except ValueError:
+        return None
+    if m.group("cents"):
+        value /= 100.0
+    return value
+
+
+def parse_priced_per_unit(size: Optional[str]) -> Optional[str]:
+    """Detect 'per lb' / 'per oz' style size strings.
+
+    Returns the normalized unit if the size indicates the price is already
+    a per-unit rate, otherwise None.
+    """
+    if not size:
+        return None
+    m = _PRICED_PER_RE.match(size.strip())
+    if not m:
+        return None
+    return _normalize_unit(m.group(1))

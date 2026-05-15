@@ -96,9 +96,13 @@
     }
     .search-row input:focus { border-color: var(--primary); }
 
-    /* ── Grocery list modal ────────────────────────────────── */
-    .grocery-btn { margin-top: 10px; }
+    .limit-select {
+      padding: 2px 4px; border: 1px solid var(--border); border-radius: 4px;
+      font-size: .75rem; background: var(--card); color: var(--fg); outline: none;
+    }
+    .limit-select:focus { border-color: var(--primary); }
 
+    /* ── Grocery list modal ────────────────────────────────── */
     .grocery-overlay {
       display: none; position: fixed; inset: 0; z-index: 200;
       background: rgba(0,0,0,.35); align-items: center; justify-content: center;
@@ -199,10 +203,11 @@
       color: var(--muted); font-size: .75rem;
     }
     .results-group-header > button:not(.btn-list):hover { color: var(--danger); }
-    .results-group-header .btn-list { margin-left: auto; }
+    .results-group-header .btn-list { margin-left: 6px; }
     .results-group-header .btn-list + button { margin-left: 6px; }
-    .unit-toggle {
-      margin-left: auto; font-size: .7rem; padding: 2px 6px;
+    .header-toggles { margin-left: auto; display: flex; align-items: center; gap: 6px; }
+    .unit-toggle, .sort-toggle {
+      font-size: .7rem; padding: 2px 6px;
       border: 1px solid var(--border); border-radius: 4px;
       background: #fff; color: var(--muted); cursor: pointer;
       text-transform: none; letter-spacing: 0;
@@ -230,6 +235,8 @@
     }
     .product-row-info { flex: 1; min-width: 0; }
     .product-row-name { font-size: .82rem; font-weight: 600; line-height: 1.3; }
+    .product-row-name a { color: inherit; text-decoration: none; }
+    .product-row-name a:hover { text-decoration: underline; color: var(--primary); }
     .product-row-meta { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; margin-top: 3px; }
     .product-row-sub  { font-size: .72rem; color: var(--muted); }
     .product-row-oos  { font-size: .72rem; color: var(--danger); }
@@ -293,8 +300,12 @@
       border: 1px solid var(--border); border-radius: 8px;
       padding: 10px; margin-bottom: 8px; display: flex; flex-direction: column; gap: 6px;
     }
+    .cart-item.ci-selected { border-color: var(--primary); background: #eff6ff; }
     .cart-item-top {
       display: flex; align-items: flex-start; gap: 6px;
+    }
+    .ci-check {
+      margin: 2px 0 0; flex-shrink: 0; accent-color: var(--primary); cursor: pointer;
     }
     .cart-item-name {
       flex: 1; font-size: .8rem; font-weight: 600; line-height: 1.3;
@@ -346,6 +357,178 @@
       background: #fef2f2; border: 1px solid #fecaca; color: var(--danger);
       border-radius: 8px; padding: 10px 14px; font-size: .82rem;
     }
+
+    /* ── Recipe UI ──────────────────────────────────────── */
+    .recipe-overlay {
+      display: none; position: fixed; inset: 0; z-index: 200;
+      background: rgba(0,0,0,.35); align-items: center; justify-content: center;
+    }
+    .recipe-overlay.open { display: flex; }
+
+    .recipe-modal {
+      background: var(--card); border-radius: 14px; width: 480px; max-width: 95vw;
+      max-height: 75vh; display: flex; flex-direction: column;
+      box-shadow: 0 12px 40px rgba(0,0,0,.2);
+    }
+    .recipe-modal-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 14px 18px; border-bottom: 1px solid var(--border); flex-shrink: 0;
+    }
+    .recipe-modal-header h3 { font-size: .95rem; font-weight: 700; }
+    .recipe-modal-close {
+      background: none; border: none; cursor: pointer; font-size: 1.3rem;
+      color: var(--muted); line-height: 1; padding: 0 2px;
+    }
+    .recipe-modal-close:hover { color: var(--danger); }
+    .recipe-modal-body { flex: 1; overflow-y: auto; padding: 8px 0; }
+    .recipe-modal-footer {
+      padding: 12px 18px; border-top: 1px solid var(--border); flex-shrink: 0;
+      display: flex; gap: 6px;
+    }
+    .recipe-modal-footer input {
+      flex: 1; padding: 7px 10px; border: 1px solid var(--border);
+      border-radius: 6px; font-size: .82rem; min-width: 0; outline: none;
+    }
+    .recipe-modal-footer input:focus { border-color: var(--primary); }
+
+    .recipe-list-item {
+      display: flex; align-items: center; gap: 12px;
+      padding: 10px 18px; font-size: .82rem; cursor: pointer;
+    }
+    .recipe-list-item:hover { background: #f8fafc; }
+    .recipe-list-item .rli-name { font-weight: 600; }
+    .recipe-list-item .rli-cost { font-size: .78rem; color: var(--muted); }
+    .recipe-list-item .rli-remove {
+      background: none; border: none; cursor: pointer; color: var(--muted);
+      font-size: 1rem; line-height: 1; padding: 0 2px;
+    }
+    .recipe-list-item .rli-remove:hover { color: var(--danger); }
+    .rli-image {
+      width: 64px; height: 64px; object-fit: cover;
+      border-radius: 8px; flex-shrink: 0;
+    }
+    .rli-image-placeholder {
+      width: 64px; height: 64px; border-radius: 8px; flex-shrink: 0;
+      background: linear-gradient(135deg, #e8f0fe, #f0e6ff);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.4rem; color: #94a3b8;
+    }
+    .recipe-empty { text-align: center; color: var(--muted); padding: 28px 16px; font-size: .82rem; }
+
+    /* Recipe editor (shown in main panel) */
+    .recipe-editor {
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: 12px; padding: 16px; display: flex; flex-direction: column; gap: 14px;
+    }
+    .recipe-editor-header {
+      display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+    }
+    .recipe-editor-header input[type="text"] {
+      flex: 1; min-width: 150px; padding: 8px 12px; border: 1px solid var(--border);
+      border-radius: 8px; font-size: 1rem; font-weight: 700; outline: none;
+    }
+    .recipe-editor-header input[type="text"]:focus { border-color: var(--primary); }
+    .recipe-editor-header .re-servings {
+      display: flex; align-items: center; gap: 5px; font-size: .82rem;
+    }
+    .recipe-editor-header .re-servings input {
+      width: 50px; padding: 6px 8px; border: 1px solid var(--border);
+      border-radius: 6px; font-size: .82rem; text-align: center; outline: none;
+    }
+    .recipe-editor-header .re-servings input:focus { border-color: var(--primary); }
+
+    /* Recipe editor hero image */
+    .recipe-hero-image {
+      width: 100%; max-height: 300px; object-fit: contain;
+      border-radius: 10px; display: block;
+    }
+    .recipe-hero-placeholder {
+      width: 100%; height: 120px;
+      border: 2px dashed var(--border); border-radius: 10px;
+      display: flex; align-items: center; justify-content: center;
+      color: var(--muted); font-size: .82rem;
+      background: #fafbfc;
+    }
+
+    .recipe-cost-summary {
+      display: flex; gap: 16px; align-items: center; flex-wrap: wrap;
+      padding: 10px 14px; background: #f0fdf4; border-radius: 8px;
+      font-size: .85rem;
+    }
+    .recipe-cost-summary .rcs-total { font-weight: 700; font-size: 1rem; }
+    .recipe-cost-summary .rcs-per-serving { color: var(--muted); }
+
+    .ingredient-table { width: 100%; border-collapse: collapse; font-size: .8rem; }
+    .ingredient-table th {
+      text-align: left; font-size: .7rem; font-weight: 700; color: var(--muted);
+      text-transform: uppercase; letter-spacing: .04em; padding: 6px 8px;
+      border-bottom: 2px solid var(--border);
+    }
+    .ingredient-table td {
+      padding: 8px; border-bottom: 1px solid var(--border); vertical-align: top;
+    }
+    .ingredient-table tr:last-child td { border-bottom: none; }
+
+    .ing-qty-input {
+      width: 50px; padding: 5px 6px; border: 1px solid var(--border);
+      border-radius: 5px; font-size: .8rem; text-align: center; outline: none;
+    }
+    .ing-qty-input:focus { border-color: var(--primary); }
+    .ing-unit-select {
+      padding: 5px 4px; border: 1px solid var(--border);
+      border-radius: 5px; font-size: .78rem; outline: none; max-width: 80px;
+    }
+    .ing-unit-select:focus { border-color: var(--primary); }
+    .ing-name-input {
+      width: 100%; padding: 5px 8px; border: 1px solid var(--border);
+      border-radius: 5px; font-size: .8rem; outline: none;
+    }
+    .ing-name-input:focus { border-color: var(--primary); }
+
+    .ing-product-info {
+      font-size: .75rem; display: flex; flex-direction: column; gap: 2px;
+    }
+    .ing-product-name { font-weight: 600; }
+    .ing-product-meta { color: var(--muted); }
+    .ing-product-cost { font-weight: 700; color: var(--success); }
+    .ing-product-breakdown { font-size: .7rem; color: var(--muted); font-style: italic; }
+    .ing-no-product { color: var(--muted); font-style: italic; font-size: .75rem; }
+
+    .ing-actions { display: flex; gap: 4px; }
+    .ing-actions button {
+      background: none; border: 1px solid var(--border); border-radius: 5px;
+      cursor: pointer; font-size: .7rem; padding: 3px 7px; color: var(--muted);
+      white-space: nowrap;
+    }
+    .ing-actions button:hover { background: var(--bg); }
+    .ing-actions .ing-remove:hover { color: var(--danger); border-color: #fca5a5; }
+
+    .ing-search-results {
+      background: #f8fafc; border: 1px solid var(--border); border-radius: 8px;
+      padding: 8px; margin-top: 6px; max-height: 250px; overflow-y: auto;
+    }
+    .ing-search-result {
+      display: flex; align-items: center; gap: 8px; padding: 6px 8px;
+      border-radius: 6px; cursor: pointer; font-size: .78rem;
+    }
+    .ing-search-result:hover { background: #e2e8f0; }
+    .ing-search-result img {
+      width: 36px; height: 36px; object-fit: contain; border-radius: 4px;
+      background: #fff; flex-shrink: 0;
+    }
+    .ing-search-result .isr-info { flex: 1; min-width: 0; }
+    .ing-search-result .isr-name { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .ing-search-result .isr-meta { font-size: .7rem; color: var(--muted); }
+    .ing-search-result .isr-price { font-weight: 700; flex-shrink: 0; }
+
+    .add-ingredient-row {
+      display: flex; gap: 6px; padding: 8px; align-items: center;
+    }
+    .add-ingredient-row input {
+      flex: 1; padding: 6px 10px; border: 1px solid var(--border);
+      border-radius: 6px; font-size: .8rem; outline: none;
+    }
+    .add-ingredient-row input:focus { border-color: var(--primary); }
 
     /* ── Mobile cart bar (hidden on desktop) ────────────── */
     .cart-bar {
@@ -466,6 +649,11 @@
         width: 95vw;
         max-height: 80vh;
       }
+
+      /* Recipe images: smaller on mobile */
+      .rli-image, .rli-image-placeholder { width: 52px; height: 52px; }
+      .recipe-hero-image { max-height: 180px; }
+      .recipe-hero-placeholder { height: 80px; }
     }
   </style>
 </head>
@@ -487,13 +675,19 @@
         <input type="checkbox" id="chkWalmart" checked> Walmart
       </label>
     </div>
-    <div class="header-field">
-      <label for="storeSelect">Store:</label>
+    <div class="header-field" id="walmartStoreField">
+      <label for="storeSelect">Walmart Store:</label>
       <select id="storeSelect" style="padding:4px 8px;border-radius:6px;border:none;font-size:.82rem;max-width:220px;">
         <option value="">Enter zip to load stores</option>
       </select>
       <button class="btn btn-sm btn-ghost" style="font-size:.75rem;padding:4px 8px;background:rgba(255,255,255,.15);color:#fff;"
               onclick="useMyLocation()" title="Use my location">📍</button>
+    </div>
+    <div class="header-field" id="aldiStoreField">
+      <label for="aldiStoreSelect">Aldi Store:</label>
+      <select id="aldiStoreSelect" style="padding:4px 8px;border-radius:6px;border:none;font-size:.82rem;max-width:220px;">
+        <option value="">Enter zip to load stores</option>
+      </select>
     </div>
   </div>
 </header>
@@ -512,9 +706,15 @@
         <button class="btn btn-primary" onclick="doSearch()">Search</button>
       </div>
 
-      <!-- Grocery list button -->
-      <button class="btn btn-sm btn-ghost grocery-btn" id="groceryBtn" onclick="toggleGroceryModal()">Grocery List</button>
+      <!-- Grocery list & recipe buttons -->
+      <div style="display:flex;gap:6px;margin-top:10px;">
+        <button class="btn btn-sm btn-ghost" id="groceryBtn" onclick="toggleGroceryModal()">Grocery List</button>
+        <button class="btn btn-sm btn-ghost" id="recipeBtn" onclick="toggleRecipeModal()">Recipes</button>
+      </div>
     </div>
+
+    <!-- Recipe editor (hidden by default, shown when editing a recipe) -->
+    <div id="recipeEditorContainer" style="display:none"></div>
 
     <!-- Results (one block per search query) -->
     <div class="results-block" id="resultsBlock"></div>
@@ -531,11 +731,12 @@
   <div class="cart-panel">
     <div class="cart-header">
       <h2>Cart</h2>
+      <button class="btn btn-sm btn-ghost" id="compareBtn" style="display:none" onclick="compareSelected()">Compare</button>
       <button class="btn btn-sm btn-ghost" style="color:var(--danger)" onclick="clearCart()">Clear</button>
       <button class="cart-close" onclick="toggleMobileCart()" title="Close cart">&times;</button>
     </div>
     <div style="padding:4px 16px 0;">
-      <button class="btn btn-sm btn-ghost" style="font-size:.72rem;padding:3px 8px;" onclick="loadLinks()">Use Grocery List</button>
+      <button class="btn btn-sm btn-ghost" style="font-size:.72rem;padding:3px 8px;" onclick="importGroceryList()">Import Grocery List</button>
       <span class="load-links-status" id="loadLinksStatus"></span>
     </div>
     <div class="cart-items" id="cartItems">
@@ -573,8 +774,27 @@
         <button class="btn btn-sm btn-primary" onclick="addToList()">+ Add</button>
       </div>
       <div class="gf-actions">
-        <button class="btn btn-sm btn-ghost" onclick="searchAll()">Search All Terms</button>
+        <button class="btn btn-sm btn-ghost" onclick="loadLinks()">Import Links</button>
+        <button class="btn btn-sm btn-ghost" onclick="searchAll()">Search Terms</button>
       </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Recipe list modal ── -->
+<div class="recipe-overlay" id="recipeOverlay" onclick="if(event.target===this)toggleRecipeModal()">
+  <div class="recipe-modal">
+    <div class="recipe-modal-header">
+      <h3>Recipes</h3>
+      <button class="recipe-modal-close" onclick="toggleRecipeModal()">&times;</button>
+    </div>
+    <div class="recipe-modal-body" id="recipeModalBody">
+      <div class="recipe-empty">No recipes yet.</div>
+    </div>
+    <div class="recipe-modal-footer">
+      <input type="text" id="recipeNameInput" placeholder="New recipe name…"
+             onkeydown="if(event.key==='Enter') createRecipe()">
+      <button class="btn btn-sm btn-primary" onclick="createRecipe()">+ New</button>
     </div>
   </div>
 </div>
@@ -583,10 +803,13 @@
 <script>
   // ── State ──────────────────────────────────────────────
   const state = {
-    results: {},    // { query: [ ...products ] }
-    cart: [],       // [ { ...product, quantity, searchQuery } ]
-    grocery: [],    // [ { type: 'link'|'search', store?: string, value: string } ]
-    unitMeta: {},   // { query: { default, options, container_label, selected } }
+    results: {},       // { query: [ ...products ] }
+    cart: [],          // [ { ...product, quantity, searchQuery } ]
+    grocery: [],       // [ { type: 'link'|'search', store?: string, value: string } ]
+    unitMeta: {},      // { query: { default, options, container_label, selected } }
+    sortMode: {},      // { query: 'store'|'unit_price'|'total_price' }
+    resultLimit: {},   // { query: number } — results per query (default 12)
+    compareSet: new Set(),  // indices of cart items selected for comparison
   };
 
   // Map a unit-rep key to its display label for the toggle dropdown.
@@ -599,6 +822,7 @@
       case 'per_gal':    return 'per gallon';
       case 'per_oz':     return 'per oz';
       case 'per_lb':     return 'per lb';
+      case 'per_100_ct': return 'per 100 ct';
       default:           return key;
     }
   }
@@ -630,6 +854,18 @@
     return document.getElementById('storeSelect').value || null;
   }
 
+  function getAldiShopId() {
+    const sel = document.getElementById('aldiStoreSelect');
+    const opt = sel.options[sel.selectedIndex];
+    return opt ? (opt.dataset.shopId || null) : null;
+  }
+
+  function getAldiZoneId() {
+    const sel = document.getElementById('aldiStoreSelect');
+    const opt = sel.options[sel.selectedIndex];
+    return opt ? (opt.dataset.zoneId || null) : null;
+  }
+
   // ── Store selector ──────────────────────────────────────
   let storeLoadTimeout = null;
 
@@ -637,7 +873,7 @@
     clearTimeout(storeLoadTimeout);
     const z = zip();
     if (z.length === 5) {
-      storeLoadTimeout = setTimeout(() => loadStores(z), 400);
+      storeLoadTimeout = setTimeout(() => { loadStores(z); loadAldiStores(z); }, 400);
     }
   });
 
@@ -673,6 +909,50 @@
     refreshResults();
   });
 
+  async function loadAldiStores(zipCode) {
+    const sel = document.getElementById('aldiStoreSelect');
+    sel.innerHTML = '<option value="">Loading stores...</option>';
+    try {
+      const resp = await fetch(`/api/stores?zip=${encodeURIComponent(zipCode)}&store=aldi`);
+      const data = await resp.json();
+      if (data.error || !data.stores || !data.stores.length) {
+        sel.innerHTML = '<option value="">No Aldi stores found</option>';
+        return;
+      }
+      sel.innerHTML = data.stores.map(s => {
+        const dist = s.distance != null ? ` (${s.distance} mi)` : '';
+        const label = s.name || s.address || `Store ${s.shop_id}`;
+        return `<option value="${esc(s.shop_id)}" data-shop-id="${esc(s.shop_id)}" data-zone-id="${esc(s.zone_id)}">${esc(label)}${dist}</option>`;
+      }).join('');
+      // Restore previously selected Aldi store
+      const saved = localStorage.getItem('selectedAldiShopId');
+      if (saved && sel.querySelector(`option[value="${saved}"]`)) {
+        sel.value = saved;
+      }
+      refreshResults();
+    } catch (e) {
+      sel.innerHTML = '<option value="">Error loading stores</option>';
+    }
+  }
+
+  document.getElementById('aldiStoreSelect').addEventListener('change', () => {
+    const shopId = getAldiShopId();
+    if (shopId) localStorage.setItem('selectedAldiShopId', shopId);
+    else localStorage.removeItem('selectedAldiShopId');
+    refreshResults();
+  });
+
+  // Show/hide store dropdowns based on checkbox state
+  function updateStoreFieldVisibility() {
+    document.getElementById('walmartStoreField').style.display =
+      document.getElementById('chkWalmart').checked ? '' : 'none';
+    document.getElementById('aldiStoreField').style.display =
+      document.getElementById('chkAldi').checked ? '' : 'none';
+  }
+  document.getElementById('chkAldi').addEventListener('change', updateStoreFieldVisibility);
+  document.getElementById('chkWalmart').addEventListener('change', updateStoreFieldVisibility);
+  updateStoreFieldVisibility();
+
   async function refreshResults() {
     const queries = Object.keys(state.results);
     if (!queries.length) return;
@@ -694,6 +974,7 @@
         if (data.zip) {
           document.getElementById('zipInput').value = data.zip;
           loadStores(data.zip);
+          loadAldiStores(data.zip);
         } else {
           alert('Could not determine zip from location');
         }
@@ -711,7 +992,7 @@
   // Load stores on page load
   (() => {
     const z = zip();
-    if (z.length === 5) loadStores(z);
+    if (z.length === 5) { loadStores(z); loadAldiStores(z); }
   })();
 
   // ── Search ─────────────────────────────────────────────
@@ -728,7 +1009,12 @@
 
     try {
       const sid = getStoreId();
-      const url = `/api/search?q=${encodeURIComponent(query)}&stores=${stores.join(',')}&zip=${zip()}&limit=12${sid ? '&store_id=' + encodeURIComponent(sid) : ''}`;
+      const aldiShopId = getAldiShopId();
+      const aldiZoneId = getAldiZoneId();
+      const resultLimit = state.resultLimit[query] || 12;
+      let url = `/api/search?q=${encodeURIComponent(query)}&stores=${stores.join(',')}&zip=${zip()}&limit=${resultLimit}${sid ? '&store_id=' + encodeURIComponent(sid) : ''}`;
+      if (aldiShopId) url += '&aldi_shop_id=' + encodeURIComponent(aldiShopId);
+      if (aldiZoneId) url += '&aldi_zone_id=' + encodeURIComponent(aldiZoneId);
       const resp = await fetch(url);
       const data = await resp.json();
 
@@ -774,6 +1060,7 @@
     const wasCollapsed = el.classList.contains('collapsed');
 
     const meta = state.unitMeta[query];
+    const curSort = state.sortMode[query] || 'store';
     const unitSelector = (meta && meta.options.length > 1) ? `
       <select class="unit-toggle"
               onclick="event.stopPropagation()"
@@ -782,12 +1069,33 @@
           `<option value="${esc(k)}" ${k === meta.selected ? 'selected' : ''}>${esc(unitLabel(k, meta.container_label))}</option>`
         ).join('')}
       </select>` : '';
+    const sortSelector = `
+      <select class="sort-toggle"
+              onclick="event.stopPropagation()"
+              onchange="setSortMode(${jsonAttr(query)}, this.value)">
+        <option value="store" ${curSort === 'store' ? 'selected' : ''}>Sort By: Store</option>
+        <option value="unit_price" ${curSort === 'unit_price' ? 'selected' : ''}>Sort By: Unit Price</option>
+        <option value="total_price" ${curSort === 'total_price' ? 'selected' : ''}>Sort By: Total Price</option>
+      </select>`;
 
+    const curLimit = state.resultLimit[query] || 12;
+    const limitSelector = `
+      <select class="limit-select"
+              onclick="event.stopPropagation()"
+              onchange="setResultLimit(${jsonAttr(query)}, this.value)">
+        ${[12, 24, 48, 96].map(n =>
+          `<option value="${n}" ${n === curLimit ? 'selected' : ''}>${n} results</option>`
+        ).join('')}
+      </select>`;
     const hdr = (extra = '') => `
       <div class="results-group-header" onclick="toggleQueryBlock(${jsonAttr(query)})">
         <span class="toggle-arrow">▼</span>
         ${esc(query)}
-        ${unitSelector}
+        <div class="header-toggles">
+          ${unitSelector}
+          ${sortSelector}
+          ${limitSelector}
+        </div>
         ${extra}
       </div>`;
     const listBtn = `<button class="btn-list" onclick="event.stopPropagation(); addTermToList(${jsonAttr(query)}, event)">+ List</button>`;
@@ -800,9 +1108,13 @@
     } else if (!payload.products.length) {
       el.innerHTML = hdr(removeBtn) + `<div class="results-group-body"><div class="spinner">No results found.</div></div>`;
     } else {
+      const sorted = sortedProducts(payload.products, query);
       el.innerHTML = hdr(removeBtn) + `
         <div class="results-group-body">
-          ${payload.products.map((p, i) => productRowHTML(p, query, i)).join('')}
+          ${sorted.map((p, displayIdx) => {
+            const origIdx = payload.products.indexOf(p);
+            return productRowHTML(p, query, origIdx, displayIdx);
+          }).join('')}
         </div>`;
     }
 
@@ -818,6 +1130,8 @@
     const el = document.getElementById(`rg-${querySlug(query)}`);
     if (el) el.remove();
     delete state.results[query];
+    delete state.sortMode[query];
+    delete state.resultLimit[query];
     renderComparison();
   }
 
@@ -832,7 +1146,8 @@
     return p.unit_price_string;
   }
 
-  function productRowHTML(p, query, idx) {
+  function productRowHTML(p, query, idx, displayIdx) {
+    if (displayIdx === undefined) displayIdx = idx;
     const price = p.price_string ?? (p.price != null ? `$${p.price.toFixed(2)}` : 'N/A');
     const imgEl = p.image_url
       ? `<img class="product-row-img" src="${esc(p.image_url)}" alt=""
@@ -844,10 +1159,10 @@
 
     return `
       <div class="product-row">
-        <span class="product-row-num">${idx + 1}</span>
+        <span class="product-row-num">${displayIdx + 1}</span>
         ${imgEl}
         <div class="product-row-info">
-          <div class="product-row-name">${esc(p.name)}</div>
+          <div class="product-row-name">${p.url ? `<a href="${esc(p.url)}" target="_blank" rel="noopener">${esc(p.name)}</a>` : esc(p.name)}</div>
           <div class="product-row-meta">
             <span class="store-badge ${esc(p.store)}">${esc(p.store.toUpperCase())}</span>
             ${p.brand ? `<span class="product-row-sub">${esc(p.brand)}</span>` : ''}
@@ -872,6 +1187,42 @@
     meta.selected = unitKey;
     const products = state.results[query];
     if (products) renderQueryBlock(query, { products });
+  }
+
+  function setSortMode(query, mode) {
+    state.sortMode[query] = mode;
+    const products = state.results[query];
+    if (products) renderQueryBlock(query, { products });
+  }
+
+  function setResultLimit(query, limit) {
+    state.resultLimit[query] = parseInt(limit, 10);
+    doSearch(query);
+  }
+
+  function sortedProducts(products, query) {
+    const mode = state.sortMode[query] || 'store';
+    const sorted = [...products];
+    if (mode === 'store') {
+      // Default order: grouped by store (aldi first), sponsored last
+      sorted.sort((a, b) => {
+        const sa = a.store === 'aldi' ? 0 : 1;
+        const sb = b.store === 'aldi' ? 0 : 1;
+        if (sa !== sb) return sa - sb;
+        return (a.sponsored ? 1 : 0) - (b.sponsored ? 1 : 0);
+      });
+    } else if (mode === 'total_price') {
+      sorted.sort((a, b) => (a.price ?? Infinity) - (b.price ?? Infinity));
+    } else if (mode === 'unit_price') {
+      const meta = state.unitMeta[query];
+      const key = meta ? meta.selected : null;
+      sorted.sort((a, b) => {
+        const av = (key && a.std_units && a.std_units[key]) ? a.std_units[key].value : Infinity;
+        const bv = (key && b.std_units && b.std_units[key]) ? b.std_units[key].value : Infinity;
+        return av - bv;
+      });
+    }
+    return sorted;
   }
 
   // ── Grocery list (persistent, file-backed) ────────────
@@ -963,6 +1314,14 @@
     }
 
     btn.textContent = count ? `Grocery List (${count})` : 'Grocery List';
+  }
+
+  async function importGroceryList() {
+    const hasLinks = state.grocery.some(g => g.type === 'link');
+    const hasSearches = state.grocery.some(g => g.type === 'search');
+    if (!hasLinks && !hasSearches) { alert('Your grocery list is empty.'); return; }
+    if (hasLinks) await loadLinks();
+    if (hasSearches) await searchAll();
   }
 
   async function searchAll() {
@@ -1084,7 +1443,15 @@
 
   function removeFromCart(idx) {
     state.cart.splice(idx, 1);
+    // Rebuild compareSet: remove the deleted index, shift higher indices down
+    const newSet = new Set();
+    for (const i of state.compareSet) {
+      if (i < idx) newSet.add(i);
+      else if (i > idx) newSet.add(i - 1);
+    }
+    state.compareSet = newSet;
     renderCart();
+    updateCompareBtn();
     renderComparison();
   }
 
@@ -1095,6 +1462,8 @@
 
   function clearCart() {
     state.cart = [];
+    state.compareSet = new Set();
+    updateCompareBtn();
     renderCart();
     renderComparison();
   }
@@ -1115,9 +1484,12 @@
       total += lineTotal;
       const price = item.price_string ?? (item.price != null ? `$${item.price.toFixed(2)}` : '?');
       const lineTotalStr = item.price != null ? `$${lineTotal.toFixed(2)}` : '?';
+      const checked = state.compareSet.has(i);
       return `
-        <div class="cart-item">
+        <div class="cart-item ${checked ? 'ci-selected' : ''}">
           <div class="cart-item-top">
+            <input type="checkbox" class="ci-check" ${checked ? 'checked' : ''}
+                   onchange="toggleCompare(${i}, this.checked)">
             <div class="cart-item-name">${esc(item.name)}</div>
             <button class="ci-remove" onclick="removeFromCart(${i})" title="Remove">×</button>
           </div>
@@ -1143,52 +1515,546 @@
   }
 
   // ── Price comparison ────────────────────────────────────
-  function renderComparison() {
+  const UNIT_PREF = ['per_fl_oz', 'per_gal', 'per_oz', 'per_lb', 'per_ea', 'per_dozen', 'per_100_ct'];
+  const UNIT_PREF_LABELS = {
+    per_fl_oz:  'price per fl oz',
+    per_gal:    'price per gallon',
+    per_oz:     'price per oz',
+    per_lb:     'price per lb',
+    per_ea:     'price each',
+    per_dozen:  'price per dozen',
+    per_100_ct: 'price per 100 ct',
+  };
+
+  function toggleCompare(idx, checked) {
+    if (checked) state.compareSet.add(idx);
+    else state.compareSet.delete(idx);
+    updateCompareBtn();
+    // Re-render to update highlight without losing checkbox state
+    const el = document.querySelectorAll('.cart-item')[idx];
+    if (el) el.classList.toggle('ci-selected', checked);
+  }
+
+  function updateCompareBtn() {
+    const btn = document.getElementById('compareBtn');
+    const n = state.compareSet.size;
+    if (n >= 2) {
+      btn.style.display = '';
+      btn.textContent = `Compare (${n})`;
+    } else {
+      btn.style.display = 'none';
+    }
+  }
+
+  function bestComparisonUnit(items) {
+    const counts = {};
+    for (const item of items) {
+      if (!item.std_units) continue;
+      for (const k of Object.keys(item.std_units)) {
+        counts[k] = (counts[k] || 0) + 1;
+      }
+    }
+    const shared = Object.keys(counts).filter(k => counts[k] >= 2);
+    if (!shared.length) return null;
+    for (const k of UNIT_PREF) {
+      if (shared.includes(k)) return k;
+    }
+    return shared[0];
+  }
+
+  function compareSelected() {
+    const items = [...state.compareSet].map(i => state.cart[i]).filter(Boolean);
+    if (items.length < 2) { alert('Select at least 2 cart items to compare.'); return; }
+
     const card = document.getElementById('comparisonCard');
     const body = document.getElementById('comparisonBody');
 
-    // Group cart items by searchQuery; only compare groups with 2+ items
-    const groups = {};
-    for (const item of state.cart) {
-      const q = item.searchQuery ?? 'Other';
-      (groups[q] ??= []).push(item);
-    }
-    const comparable = Object.entries(groups).filter(([, items]) => items.length >= 2);
-
-    if (!comparable.length) { card.style.display = 'none'; return; }
+    const unitKey = bestComparisonUnit(items);
+    const unitLabel = unitKey ? UNIT_PREF_LABELS[unitKey] || unitKey : null;
+    const getUnitVal = (item) => item.std_units?.[unitKey]?.value ?? null;
+    const withUnit = unitKey ? items.filter(i => getUnitVal(i) != null) : [];
+    const minUnitVal = withUnit.length ? Math.min(...withUnit.map(getUnitVal)) : null;
 
     card.style.display = '';
+    body.innerHTML = `
+      <div class="comp-group">
+        ${unitLabel ? `<div class="comp-group-title">Compared by ${esc(unitLabel)}</div>` : ''}
+        <div class="comp-items">
+          ${items.map(item => {
+            const unitVal = getUnitVal(item);
+            const unitStr = item.std_units?.[unitKey]?.string ?? null;
+            const isBest = unitVal != null && unitVal === minUnitVal && withUnit.length >= 2;
+            const price  = item.price_string ?? (item.price != null ? `$${item.price.toFixed(2)}` : 'N/A');
 
-    body.innerHTML = comparable.map(([query, items]) => {
-      const withPrice = items.filter(i => i.price != null);
-      const minPrice  = withPrice.length ? Math.min(...withPrice.map(i => i.price)) : null;
+            let verdict = '';
+            if (isBest) {
+              verdict = '<div class="ci-best">✓ Best value</div>';
+            } else if (unitVal != null && minUnitVal != null) {
+              const pctMore = ((unitVal - minUnitVal) / minUnitVal * 100).toFixed(0);
+              verdict = `<div class="ci-more">${pctMore}% more per unit</div>`;
+            }
 
-      return `
-        <div class="comp-group">
-          <div class="comp-group-title">Search: "${esc(query)}"</div>
-          <div class="comp-items">
-            ${items.map(item => {
-              const isBest = item.price != null && item.price === minPrice;
-              const price  = item.price_string ?? (item.price != null ? `$${item.price.toFixed(2)}` : 'N/A');
-              const extra  = (!isBest && item.price != null && minPrice != null)
-                ? `<div class="ci-more">+$${(item.price - minPrice).toFixed(2)} vs best</div>`
-                : '';
-              return `
-                <div class="comp-item ${isBest ? 'best' : ''}">
-                  <div class="ci-store store-badge ${esc(item.store)}">${esc(item.store.toUpperCase())}</div>
-                  <div class="ci-name">${esc(item.name)}</div>
-                  ${item.size ? `<div class="ci-size">${esc(item.size)}</div>` : ''}
-                  <div class="ci-price">${esc(price)}</div>
-                  ${item.unit_price_string ? `<div class="ci-unit">${esc(item.unit_price_string)}</div>` : ''}
-                  ${isBest ? '<div class="ci-best">✓ Best price</div>' : extra}
-                </div>
-              `;
-            }).join('')}
+            return `
+              <div class="comp-item ${isBest ? 'best' : ''}">
+                <div class="ci-store store-badge ${esc(item.store)}">${esc(item.store.toUpperCase())}</div>
+                <div class="ci-name">${esc(item.name)}</div>
+                ${item.size ? `<div class="ci-size">${esc(item.size)}</div>` : ''}
+                <div class="ci-price">${esc(price)}</div>
+                ${unitStr ? `<div class="ci-unit">${esc(unitStr)}</div>` : ''}
+                ${verdict}
+              </div>
+            `;
+          }).join('')}
+        </div>
+      </div>
+    `;
+
+    // Scroll comparison into view
+    card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+
+  function renderComparison() {
+    // Comparison is now manual — hide the card when cart changes
+    document.getElementById('comparisonCard').style.display = 'none';
+  }
+
+  // ── Recipe state & functions ────────────────────────────────────
+  const recipeState = {
+    recipes: [],
+    editing: null,          // full recipe object when editing
+    ingredientSearch: {},   // { ingredientId: { loading, results, query } }
+  };
+
+  const COOKING_UNITS = [
+    "cup", "tbsp", "tsp",
+    "oz", "lb", "g", "kg",
+    "fl oz", "gallon", "quart", "pint", "liter", "ml",
+    "each", "dozen",
+    "stick", "clove",
+    "whole", "piece", "slice",
+  ];
+
+  function toggleRecipeModal() {
+    document.getElementById('recipeOverlay').classList.toggle('open');
+  }
+
+  async function loadRecipes() {
+    try {
+      const resp = await fetch('/api/recipes');
+      const data = await resp.json();
+      recipeState.recipes = data.recipes || [];
+      renderRecipeList();
+    } catch (e) { console.error('Failed to load recipes:', e); }
+  }
+
+  function renderRecipeList() {
+    const body = document.getElementById('recipeModalBody');
+    const btn = document.getElementById('recipeBtn');
+    const count = recipeState.recipes.length;
+
+    if (!count) {
+      body.innerHTML = '<div class="recipe-empty">No recipes yet. Create one below!</div>';
+    } else {
+      body.innerHTML = recipeState.recipes.map(r => `
+        <div class="recipe-list-item" onclick="openRecipe(${r.id})">
+          ${r.image_url
+            ? `<img class="rli-image" src="${esc(r.image_url)}" alt="">`
+            : `<div class="rli-image-placeholder">&#127869;</div>`}
+          <div style="flex:1;min-width:0;">
+            <div class="rli-name">${esc(r.name)}</div>
+            <div class="rli-cost">${r.servings} serving${r.servings !== 1 ? 's' : ''}</div>
+          </div>
+          <button class="rli-remove" onclick="event.stopPropagation(); deleteRecipeConfirm(${r.id})" title="Delete">&#215;</button>
+        </div>
+      `).join('');
+    }
+    btn.textContent = count ? `Recipes (${count})` : 'Recipes';
+  }
+
+  async function createRecipe() {
+    const input = document.getElementById('recipeNameInput');
+    const name = input.value.trim();
+    if (!name) return;
+    try {
+      const resp = await fetch('/api/recipes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, servings: 1 }),
+      });
+      const recipe = await resp.json();
+      input.value = '';
+      recipeState.recipes.push(recipe);
+      renderRecipeList();
+      openRecipe(recipe.id);
+    } catch (e) { console.error('Failed to create recipe:', e); }
+  }
+
+  async function deleteRecipeConfirm(id) {
+    if (!confirm('Delete this recipe?')) return;
+    try {
+      await fetch(`/api/recipes/${id}`, { method: 'DELETE' });
+      recipeState.recipes = recipeState.recipes.filter(r => r.id !== id);
+      renderRecipeList();
+      if (recipeState.editing && recipeState.editing.id === id) {
+        closeRecipeEditor();
+      }
+    } catch (e) { console.error('Failed to delete recipe:', e); }
+  }
+
+  async function openRecipe(id) {
+    toggleRecipeModal(); // close modal
+    try {
+      const resp = await fetch(`/api/recipes/${id}`);
+      recipeState.editing = await resp.json();
+      recipeState.ingredientSearch = {};
+      renderRecipeEditor();
+    } catch (e) { console.error('Failed to load recipe:', e); }
+  }
+
+  function closeRecipeEditor() {
+    recipeState.editing = null;
+    recipeState.ingredientSearch = {};
+    document.getElementById('recipeEditorContainer').style.display = 'none';
+  }
+
+  function renderRecipeEditor() {
+    const container = document.getElementById('recipeEditorContainer');
+    const r = recipeState.editing;
+    if (!r) { container.style.display = 'none'; return; }
+    container.style.display = '';
+
+    // Compute total cost using cheapest product per ingredient
+    let totalCost = 0;
+    let hasAllCosts = true;
+    for (const ing of r.ingredients) {
+      const prods = ing.products || [];
+      const cheapest = prods.find(p => p.ingredient_cost != null);
+      if (cheapest) totalCost += cheapest.ingredient_cost;
+      else if (prods.length > 0) hasAllCosts = false;
+    }
+    const perServing = r.servings > 0 ? totalCost / r.servings : 0;
+
+    const unitOptions = COOKING_UNITS.map(u =>
+      `<option value="${esc(u)}">${esc(u)}</option>`
+    ).join('');
+
+    container.innerHTML = `
+      <div class="recipe-editor">
+        <div class="recipe-editor-header">
+          <button class="btn btn-sm btn-ghost" onclick="closeRecipeEditor()" title="Back">&#8592; Back</button>
+          <input type="text" value="${esc(r.name)}" id="reNameInput"
+                 onchange="updateRecipeField('name', this.value)">
+          <div class="re-servings">
+            <label>Servings:</label>
+            <input type="number" value="${r.servings}" min="1" id="reServingsInput"
+                   onchange="updateRecipeField('servings', parseInt(this.value) || 1)">
+          </div>
+          <div class="re-servings">
+            <label>Image URL:</label>
+            <input type="text" value="${esc(r.image_url || '')}" placeholder="https://..."
+                   style="width:160px;" onchange="updateRecipeField('image_url', this.value || null)">
           </div>
         </div>
-      `;
-    }).join('');
+        ${r.image_url
+          ? `<img class="recipe-hero-image" src="${esc(r.image_url)}" alt="">`
+          : `<div class="recipe-hero-placeholder">No image — add a URL below</div>`}
+
+        ${totalCost > 0 ? `
+        <div class="recipe-cost-summary">
+          <span class="rcs-total">Total: $${totalCost.toFixed(2)}</span>
+          <span class="rcs-per-serving">$${perServing.toFixed(2)} per serving</span>
+          ${!hasAllCosts ? '<span style="color:var(--danger);font-size:.75rem;">* some ingredients missing prices</span>' : ''}
+        </div>
+        ` : ''}
+
+        <table class="ingredient-table">
+          <thead>
+            <tr>
+              <th style="width:55px">Qty</th>
+              <th style="width:80px">Unit</th>
+              <th>Ingredient</th>
+              <th style="min-width:180px">Product</th>
+              <th style="width:70px">Cost</th>
+              <th style="width:60px"></th>
+            </tr>
+          </thead>
+          <tbody>
+            ${r.ingredients.map(ing => ingredientRowHTML(ing, unitOptions)).join('')}
+          </tbody>
+        </table>
+
+        <div class="add-ingredient-row">
+          <input type="text" id="newIngredientInput" placeholder="Add ingredient (e.g. chicken thigh, white rice)…"
+                 onkeydown="if(event.key==='Enter') addIngredientFromInput()">
+          <button class="btn btn-sm btn-primary" onclick="addIngredientFromInput()">+ Add</button>
+        </div>
+      </div>
+    `;
   }
+
+  function ingredientRowHTML(ing, unitOptions) {
+    const search = recipeState.ingredientSearch[ing.id];
+    const searchHTML = search ? ingredientSearchHTML(ing.id, search) : '';
+    const prods = ing.products || [];
+
+    let productHTML;
+    if (prods.length > 0) {
+      productHTML = prods.map(p => `
+        <div class="ing-product-info" style="margin-bottom:4px;padding:4px 0;border-bottom:1px solid var(--border);">
+          <div class="ing-product-name">
+            ${p.product_store ? `<span class="store-badge ${esc(p.product_store)}">${esc(p.product_store.toUpperCase())}</span> ` : ''}
+            ${esc(p.product_name || '')}
+            <button onclick="removeIngredientProduct(${p.id})" style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:.8rem;padding:0 3px;" title="Remove product">×</button>
+          </div>
+          <div class="ing-product-meta">
+            ${p.product_price != null ? `$${p.product_price.toFixed(2)}` : ''}
+            ${p.product_unit_price ? ` · ${esc(p.product_unit_price)}` : ''}
+            ${p.ingredient_cost != null ? ` · Cost: $${p.ingredient_cost.toFixed(2)}` : ''}
+          </div>
+          ${p.cost_breakdown ? `<div class="ing-product-breakdown">${esc(p.cost_breakdown)}</div>` : ''}
+        </div>`).join('');
+    } else {
+      productHTML = '<div class="ing-no-product">No product linked</div>';
+    }
+
+    // Cheapest product cost
+    const cheapest = prods.find(p => p.ingredient_cost != null);
+    const costDisplay = cheapest
+      ? `<span class="ing-product-cost">$${cheapest.ingredient_cost.toFixed(2)}</span>`
+      : '<span style="color:var(--muted)">--</span>';
+
+    return `
+      <tr>
+        <td>
+          <input class="ing-qty-input" type="number" step="any" min="0"
+                 value="${ing.quantity ?? ''}"
+                 onchange="updateIngredient(${ing.id}, {quantity: parseFloat(this.value) || null})">
+        </td>
+        <td>
+          <select class="ing-unit-select" onchange="updateIngredient(${ing.id}, {unit: this.value || null})">
+            <option value="">--</option>
+            ${COOKING_UNITS.map(u =>
+              `<option value="${esc(u)}" ${ing.unit === u ? 'selected' : ''}>${esc(u)}</option>`
+            ).join('')}
+          </select>
+        </td>
+        <td>
+          <input class="ing-name-input" type="text" value="${esc(ing.name)}"
+                 onchange="updateIngredient(${ing.id}, {name: this.value})">
+          ${searchHTML}
+        </td>
+        <td>${productHTML}</td>
+        <td>${costDisplay}</td>
+        <td>
+          <div class="ing-actions">
+            <button onclick="searchForIngredient(${ing.id}, ${jsonAttr(ing.name)})">Search</button>
+            <button class="ing-remove" onclick="removeIngredient(${ing.id})">×</button>
+          </div>
+        </td>
+      </tr>`;
+  }
+
+  function ingredientSearchHTML(ingId, search) {
+    if (search.loading) {
+      return '<div class="ing-search-results"><div class="spinner">Searching…</div></div>';
+    }
+    if (!search.results || !search.results.length) {
+      return '<div class="ing-search-results"><div style="text-align:center;color:var(--muted);padding:8px;font-size:.78rem;">No results</div></div>';
+    }
+    const sortVal = search.sortMode || 'store';
+    return `
+      <div class="ing-search-results">
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:0 4px 6px;">
+          <span style="font-size:.7rem;color:var(--muted);">${search.results.length} results</span>
+          <select style="font-size:.7rem;padding:2px 4px;border:1px solid var(--border);border-radius:4px;"
+                  onchange="sortIngredientSearch(${ingId}, this.value)">
+            <option value="store" ${sortVal==='store'?'selected':''}>Sort: Store</option>
+            <option value="unit_price" ${sortVal==='unit_price'?'selected':''}>Sort: Unit Price</option>
+            <option value="total_price" ${sortVal==='total_price'?'selected':''}>Sort: Total Price</option>
+          </select>
+        </div>
+        ${search.results.map((p, i) => `
+          <div class="ing-search-result" onclick="linkProduct(${ingId}, ${i})">
+            ${p.image_url ? `<img src="${esc(p.image_url)}" alt="">` : ''}
+            <div class="isr-info">
+              <div class="isr-name">${esc(p.name)}</div>
+              <div class="isr-meta">
+                <span class="store-badge ${esc(p.store)}">${esc(p.store.toUpperCase())}</span>
+                ${p.size ? esc(p.size) : ''}
+                ${p.unit_price_string ? ' · ' + esc(p.unit_price_string) : ''}
+              </div>
+            </div>
+            <div class="isr-price">${p.price != null ? '$' + p.price.toFixed(2) : '?'}</div>
+          </div>
+        `).join('')}
+      </div>`;
+  }
+
+  function sortIngredientSearch(ingId, mode) {
+    const search = recipeState.ingredientSearch[ingId];
+    if (!search || !search.results) return;
+    search.sortMode = mode;
+    const meta = search.unitMeta || {};
+    const defaultKey = meta.unit_default;
+    search.results.sort((a, b) => {
+      if (mode === 'total_price') {
+        return (a.price ?? 999) - (b.price ?? 999);
+      }
+      if (mode === 'unit_price' && defaultKey) {
+        const aVal = a.std_units?.[defaultKey]?.value ?? 999;
+        const bVal = b.std_units?.[defaultKey]?.value ?? 999;
+        return aVal - bVal;
+      }
+      // Default: group by store
+      return (a.store || '').localeCompare(b.store || '');
+    });
+    renderRecipeEditor();
+  }
+
+  let _recipeUpdateTimer = null;
+  async function updateRecipeField(field, value) {
+    if (!recipeState.editing) return;
+    recipeState.editing[field] = value;
+    clearTimeout(_recipeUpdateTimer);
+    _recipeUpdateTimer = setTimeout(async () => {
+      try {
+        await fetch(`/api/recipes/${recipeState.editing.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ [field]: value }),
+        });
+        renderRecipeEditor();
+      } catch (e) { console.error('Failed to update recipe:', e); }
+    }, 500);
+  }
+
+  let _ingUpdateTimers = {};
+  async function updateIngredient(ingId, fields) {
+    if (!recipeState.editing) return;
+    // Update local state immediately
+    const ing = recipeState.editing.ingredients.find(i => i.id === ingId);
+    if (ing) Object.assign(ing, fields);
+
+    clearTimeout(_ingUpdateTimers[ingId]);
+    _ingUpdateTimers[ingId] = setTimeout(async () => {
+      try {
+        const resp = await fetch(`/api/ingredients/${ingId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(fields),
+        });
+        const updated = await resp.json();
+        // Server recomputes costs on qty/unit change — update local state
+        if (updated.products && ing) {
+          ing.products = updated.products;
+          ing.ingredient_cost = updated.ingredient_cost;
+          ing.cost_breakdown = updated.cost_breakdown;
+          renderRecipeEditor();
+        }
+      } catch (e) { console.error('Failed to update ingredient:', e); }
+    }, 500);
+  }
+
+  async function addIngredientFromInput() {
+    const input = document.getElementById('newIngredientInput');
+    const name = input.value.trim();
+    if (!name || !recipeState.editing) return;
+    try {
+      const resp = await fetch(`/api/recipes/${recipeState.editing.id}/ingredients`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, quantity: 1, unit: 'each' }),
+      });
+      const ing = await resp.json();
+      recipeState.editing.ingredients.push(ing);
+      input.value = '';
+      renderRecipeEditor();
+    } catch (e) { console.error('Failed to add ingredient:', e); }
+  }
+
+  async function removeIngredient(ingId) {
+    if (!recipeState.editing) return;
+    try {
+      await fetch(`/api/ingredients/${ingId}`, { method: 'DELETE' });
+      recipeState.editing.ingredients = recipeState.editing.ingredients.filter(i => i.id !== ingId);
+      delete recipeState.ingredientSearch[ingId];
+      renderRecipeEditor();
+    } catch (e) { console.error('Failed to remove ingredient:', e); }
+  }
+
+  async function searchForIngredient(ingId, name) {
+    if (!name) return;
+    recipeState.ingredientSearch[ingId] = { loading: true, results: [], query: name };
+    renderRecipeEditor();
+
+    try {
+      const stores = selectedStores();
+      const sid = getStoreId();
+      const aldiShopId = getAldiShopId();
+      const aldiZoneId = getAldiZoneId();
+      let url = `/api/search?q=${encodeURIComponent(name)}&stores=${stores.join(',')}&zip=${zip()}&limit=8`;
+      if (sid) url += '&store_id=' + encodeURIComponent(sid);
+      if (aldiShopId) url += '&aldi_shop_id=' + encodeURIComponent(aldiShopId);
+      if (aldiZoneId) url += '&aldi_zone_id=' + encodeURIComponent(aldiZoneId);
+
+      const resp = await fetch(url);
+      const data = await resp.json();
+      const products = [];
+      for (const store of ['aldi', 'walmart']) {
+        if (data[store]) products.push(...data[store]);
+      }
+      recipeState.ingredientSearch[ingId] = { loading: false, results: products, query: name, unitMeta: data.unit_meta || {} };
+      renderRecipeEditor();
+    } catch (e) {
+      recipeState.ingredientSearch[ingId] = { loading: false, results: [], query: name };
+      renderRecipeEditor();
+    }
+  }
+
+  async function linkProduct(ingId, resultIdx) {
+    const search = recipeState.ingredientSearch[ingId];
+    if (!search || !search.results[resultIdx]) return;
+    const product = search.results[resultIdx];
+    await doLinkProduct(ingId, product);
+  }
+
+  async function doLinkProduct(ingId, product) {
+    try {
+      const resp = await fetch(`/api/ingredients/${ingId}/link-product`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ product }),
+      });
+      const newProduct = await resp.json();
+      // Add to ingredient's products list
+      const ing = recipeState.editing.ingredients.find(i => i.id === ingId);
+      if (ing) {
+        if (!ing.products) ing.products = [];
+        ing.products.push(newProduct);
+        // Re-sort: cheapest first
+        ing.products.sort((a, b) => (a.ingredient_cost ?? 999) - (b.ingredient_cost ?? 999));
+      }
+      // Fully remove search state so no "No results" ghost appears
+      delete recipeState.ingredientSearch[ingId];
+      renderRecipeEditor();
+    } catch (e) { console.error('Failed to link product:', e); }
+  }
+
+  async function removeIngredientProduct(productId) {
+    try {
+      await fetch(`/api/ingredient-products/${productId}`, { method: 'DELETE' });
+      // Remove from local state
+      for (const ing of recipeState.editing.ingredients) {
+        if (ing.products) {
+          ing.products = ing.products.filter(p => p.id !== productId);
+        }
+      }
+      renderRecipeEditor();
+    } catch (e) { console.error('Failed to remove product:', e); }
+  }
+
+  // Load recipes on page load
+  loadRecipes();
 </script>
 </body>
 </html>

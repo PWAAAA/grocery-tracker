@@ -19,7 +19,7 @@ from .config import (
     BATCH_SIZE, MIN_DELAY, MAX_DELAY, DEFAULT_SEARCH_LIMIT,
 )
 from .session import AldiSession
-from .parser import parse_item
+from .parser import parse_item, parse_idp_product
 
 log = logging.getLogger(__name__)
 
@@ -34,21 +34,16 @@ def scrape_products(
     """
     Scrape multiple Aldi products by ID.
 
+    Uses the IDP REST API when a non-default shop is selected (works for
+    any store without zone_id). Falls back to the GraphQL Items query
+    for the default shop (which has a known zone_id).
+
     Batches requests to avoid oversized queries, with polite delays.
-
-    Args:
-        product_ids:  List of numeric product IDs (from URL).
-        shop_id:      Aldi store ID.
-        zone_id:      Zone ID.
-        postal_code:  Zip code.
-        session:      Optional AldiSession to reuse (creates one if not provided).
-
-    Returns:
-        List of AldiProduct results.
     """
     if session is None:
         session = AldiSession()
 
+    use_idp = shop_id != DEFAULT_SHOP_ID
     all_results = []
 
     for i in range(0, len(product_ids), BATCH_SIZE):
@@ -59,30 +54,35 @@ def scrape_products(
             log.info(f"Waiting {delay:.1f}s before next batch...")
             time.sleep(delay)
 
-        data = session.fetch_items(batch, shop_id, zone_id, postal_code)
-
-        if data is None:
-            for pid in batch:
-                all_results.append(AldiProduct(
-                    name="FETCH_ERROR",
-                    product_id=pid,
-                    price=None,
-                    price_string=None,
-                    unit_price_string=None,
-                    size=None,
-                    brand=None,
-                    in_stock=False,
-                    on_sale=False,
-                    sale_disclaimer=None,
-                    store_location=None,
-                    url="",
-                    error="GraphQL request failed",
-                ))
-            continue
-
-        items = data.get("data", {}).get("items", [])
-        for item in items:
-            all_results.append(parse_item(item))
+        if use_idp:
+            data = session.fetch_items_idp(batch, shop_id)
+            if data is None:
+                for pid in batch:
+                    all_results.append(AldiProduct(
+                        name="FETCH_ERROR", product_id=pid,
+                        price=None, price_string=None, unit_price_string=None,
+                        size=None, brand=None, in_stock=False, on_sale=False,
+                        sale_disclaimer=None, store_location=None, url="",
+                        error="IDP request failed",
+                    ))
+                continue
+            for product in data.get("products", []):
+                all_results.append(parse_idp_product(product))
+        else:
+            data = session.fetch_items(batch, shop_id, zone_id, postal_code)
+            if data is None:
+                for pid in batch:
+                    all_results.append(AldiProduct(
+                        name="FETCH_ERROR", product_id=pid,
+                        price=None, price_string=None, unit_price_string=None,
+                        size=None, brand=None, in_stock=False, on_sale=False,
+                        sale_disclaimer=None, store_location=None, url="",
+                        error="GraphQL request failed",
+                    ))
+                continue
+            items = data.get("data", {}).get("items", [])
+            for item in items:
+                all_results.append(parse_item(item))
 
     return all_results
 
@@ -105,9 +105,13 @@ def find_products(
 
     product_ids = session.search_product_ids(query, shop_id, zone_id, postal_code, limit)
     if not product_ids:
+        log.info(f"Aldi search '{query}': no product IDs found")
         return []
 
-    return scrape_products(product_ids, shop_id, zone_id, postal_code, session)
+    products = scrape_products(product_ids, shop_id, zone_id, postal_code, session)
+    errors = sum(1 for p in products if p.error)
+    log.info(f"Aldi search '{query}': {len(products)} results ({errors} errors)")
+    return products
 
 
 def extract_id_from_url(url: str) -> Optional[str]:

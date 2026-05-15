@@ -216,6 +216,57 @@ class AldiSession:
             log.error(f"Request failed: {e}")
             return None
 
+    def fetch_items_idp(
+        self,
+        product_ids: list[str],
+        shop_id: str,
+    ) -> Optional[dict]:
+        """
+        Fetch product data via the IDP REST API.
+
+        Unlike the GraphQL Items query, this endpoint only requires a shop_id
+        (no zone_id needed), making it work for any store regardless of
+        the session's geographic location.
+
+        Endpoint: GET https://www.aldi.us/idp/v1/products
+        Params:
+            shop_id:         store shop ID
+            product_ids[]:   list of numeric product IDs
+            expands[]:       ["price", "details", "availability"]
+
+        Returns the raw JSON response dict, or None on failure.
+        """
+        if not self._establish_session():
+            log.error("Could not establish authenticated session")
+            return None
+
+        # Build URL with repeated params: product_ids[]=X&product_ids[]=Y
+        id_params = "&".join(f"product_ids[]={pid}" for pid in product_ids)
+        url = (
+            f"{GRAPHQL_URL.replace('/graphql', '')}/idp/v1/products"
+            f"?shop_id={shop_id}&{id_params}"
+            f"&expands[]=price&expands[]=details&expands[]=availability"
+        )
+
+        headers = {
+            "Accept": "application/json",
+            "Referer": "https://www.aldi.us/",
+        }
+
+        try:
+            log.info(f"Fetching {len(product_ids)} items from Aldi IDP API (shop {shop_id})")
+            resp = self.session.get(url, headers=headers, timeout=15)
+
+            if resp.status_code != 200:
+                log.error(f"IDP API HTTP {resp.status_code}: {resp.text[:500]}")
+                return None
+
+            return resp.json()
+
+        except Exception as e:
+            log.error(f"IDP request failed: {e}")
+            return None
+
     def search_product_ids(
         self,
         query: str,

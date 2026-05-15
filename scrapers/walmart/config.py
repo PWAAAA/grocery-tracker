@@ -21,3 +21,6 @@ MAX_DELAY = 4.0
 # Retry config for search pages (they get CAPTCHAd more aggressively)
 MAX_RETRIES = 3
 BACKOFF_BASE = 3  # seconds — exponential: 3, 6, 12
+
+# Max pages to fetch for a single search (safety cap)
+MAX_SEARCH_PAGES = 5

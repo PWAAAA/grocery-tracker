@@ -8,8 +8,8 @@ Usage:
 Then open http://localhost:5000 in your browser.
 """
 
+import json
 import logging
-import os
 import threading
 from dataclasses import asdict
 
@@ -23,6 +23,7 @@ from scrapers.aldi import (
     find_products as aldi_find,
     scrape_products as aldi_scrape_products,
     extract_id_from_url as aldi_extract_id,
+    find_stores_by_zip as aldi_find_stores,
 )
 from scrapers.walmart import (
     scrape_search as walmart_search,
@@ -31,8 +32,15 @@ from scrapers.walmart import (
     find_stores_by_zip,
 )
 from pricing import standardize_results as standardize_unit_prices
-
-GROCERY_LIST_PATH = os.path.join(os.path.dirname(__file__), "grocery_list.txt")
+from database import (
+    init_db, get_grocery_items, set_grocery_items, classify_item,
+    get_recipes, get_recipe, create_recipe, update_recipe, delete_recipe,
+    add_ingredient, update_ingredient, delete_ingredient,
+    add_ingredient_product, delete_ingredient_product, get_ingredient_products,
+    update_ingredient_product,
+)
+from pricing.cooking import compute_ingredient_cost, format_ingredient_cost_breakdown, COOKING_UNITS
+from pricing.serving_size import parse_serving_size_density
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 log = logging.getLogger(__name__)
@@ -82,13 +90,17 @@ def api_reverse_geocode():
 @app.route("/api/stores")
 def api_stores():
     zip_code = request.args.get("zip", "").strip()
+    store_type = request.args.get("store", "walmart").strip().lower()
     if not zip_code:
         return jsonify({"error": "No zip provided"}), 400
     try:
-        stores = find_stores_by_zip(zip_code)
+        if store_type == "aldi":
+            stores = aldi_find_stores(zip_code, session=get_aldi_session())
+        else:
+            stores = find_stores_by_zip(zip_code)
         return jsonify({"stores": stores})
     except Exception as e:
-        log.error(f"Store lookup error: {e}")
+        log.error(f"Store lookup error ({store_type}): {e}")
         return jsonify({"error": str(e)}), 500
 
 
@@ -97,7 +109,7 @@ def api_search():
     q = request.args.get("q", "").strip()
     stores = [s.strip() for s in request.args.get("stores", "aldi").split(",") if s.strip()]
     zip_code = request.args.get("zip", DEFAULT_ZIP).strip() or DEFAULT_ZIP
-    limit = min(max(int(request.args.get("limit", 12)), 1), 48)
+    limit = min(max(int(request.args.get("limit", 12)), 1), 96)
 
     if not q:
         return jsonify({"error": "No query provided"}), 400
@@ -107,7 +119,16 @@ def api_search():
     if "aldi" in stores:
         try:
             session = get_aldi_session()
-            products = aldi_find(q, postal_code=zip_code, limit=limit, session=session)
+            aldi_shop_id = request.args.get("aldi_shop_id", "").strip() or None
+            aldi_zone_id = request.args.get("aldi_zone_id", "").strip() or None
+            products = aldi_find(
+                q,
+                shop_id=aldi_shop_id or DEFAULT_SHOP_ID,
+                zone_id=aldi_zone_id or DEFAULT_ZONE_ID,
+                postal_code=zip_code,
+                limit=limit,
+                session=session,
+            )
             results["aldi"] = [
                 {**asdict(p), "store": "aldi"} for p in products if not p.error
             ]
@@ -119,9 +140,12 @@ def api_search():
     if "walmart" in stores:
         try:
             store_id = request.args.get("store_id", "").strip() or None
-            raw = walmart_search(query=q, zip_code=zip_code, store_id=store_id)
+            raw = walmart_search(query=q, zip_code=zip_code, store_id=store_id, limit=limit)
             # Filter out shipping-only products (no in-store pickup)
+            pre_filter = len(raw)
             raw = [p for p in raw if p.get("in_store", True)]
+            if pre_filter != len(raw):
+                log.info(f"Walmart '{q}': filtered {pre_filter - len(raw)}/{pre_filter} shipping-only items")
             # Sponsored items go last; cap after sorting
             raw.sort(key=lambda p: bool(p.get("sponsored")))
             raw = raw[:limit]
@@ -138,10 +162,12 @@ def api_search():
                     "in_stock": p.get("in_store", True),
                     "brand": None,
                     "size": None,
+                    "serving_size": None,
                     "sponsored": p.get("sponsored", False),
                 }
                 for p in raw
             ]
+            log.info(f"Walmart '{q}': returning {len(results['walmart'])} results")
         except Exception as e:
             log.error(f"Walmart search error: {e}")
             results["walmart"] = []
@@ -163,37 +189,10 @@ def api_search():
     return jsonify(results)
 
 
-def _read_grocery_list() -> list[str]:
-    """Read grocery_list.txt and return non-empty, non-comment lines."""
-    if not os.path.exists(GROCERY_LIST_PATH):
-        return []
-    with open(GROCERY_LIST_PATH, "r", encoding="utf-8") as f:
-        return [line.strip() for line in f if line.strip() and not line.startswith("#")]
-
-
-def _write_grocery_list(items: list[str]):
-    with open(GROCERY_LIST_PATH, "w", encoding="utf-8") as f:
-        for item in items:
-            f.write(item + "\n")
-
-
-def _classify_item(item: str) -> dict:
-    """Classify a grocery list item as a link or search term."""
-    if item.startswith("http"):
-        if "walmart.com" in item:
-            return {"type": "link", "store": "walmart", "value": item}
-        elif "aldi.us" in item:
-            return {"type": "link", "store": "aldi", "value": item}
-        else:
-            return {"type": "link", "store": "unknown", "value": item}
-    return {"type": "search", "value": item}
-
-
 @app.route("/api/grocery-list", methods=["GET"])
 def api_grocery_list_get():
-    items = _read_grocery_list()
-    classified = [_classify_item(item) for item in items]
-    return jsonify({"items": classified})
+    items = get_grocery_items()
+    return jsonify({"items": items})
 
 
 @app.route("/api/grocery-list", methods=["POST"])
@@ -201,10 +200,10 @@ def api_grocery_list_post():
     data = request.get_json()
     if data is None:
         return jsonify({"error": "JSON body required"}), 400
-    items = data.get("items", [])
-    _write_grocery_list(items)
-    classified = [_classify_item(item) for item in items]
-    return jsonify({"items": classified})
+    raw_items = data.get("items", [])
+    classified = [classify_item(item) if isinstance(item, str) else item for item in raw_items]
+    set_grocery_items(classified)
+    return jsonify({"items": get_grocery_items()})
 
 
 @app.route("/api/fetch-links", methods=["POST"])
@@ -246,6 +245,7 @@ def api_fetch_links():
                 "in_stock": product.in_stock,
                 "brand": product.brand,
                 "size": None,
+                "serving_size": product.serving_size,
                 "sponsored": False,
             })
         except Exception as e:
@@ -276,6 +276,326 @@ def api_fetch_links():
 
     return jsonify({"products": results})
 
+
+# ── Recipe endpoints ───────────────────────────────────────────────
+
+@app.route("/api/recipes", methods=["GET"])
+def api_recipes_list():
+    return jsonify({"recipes": get_recipes()})
+
+
+@app.route("/api/recipes", methods=["POST"])
+def api_recipes_create():
+    data = request.get_json()
+    if not data or not data.get("name"):
+        return jsonify({"error": "name required"}), 400
+    recipe = create_recipe(
+        name=data["name"],
+        servings=data.get("servings", 1),
+        notes=data.get("notes", ""),
+        image_url=data.get("image_url"),
+    )
+    return jsonify(recipe), 201
+
+
+@app.route("/api/recipes/<int:recipe_id>", methods=["GET"])
+def api_recipe_get(recipe_id):
+    recipe = get_recipe(recipe_id)
+    if not recipe:
+        return jsonify({"error": "not found"}), 404
+    return jsonify(recipe)
+
+
+@app.route("/api/recipes/<int:recipe_id>", methods=["PUT"])
+def api_recipe_update(recipe_id):
+    data = request.get_json() or {}
+    recipe = update_recipe(
+        recipe_id,
+        name=data.get("name"),
+        servings=data.get("servings"),
+        notes=data.get("notes"),
+        image_url=data.get("image_url"),
+    )
+    if not recipe:
+        return jsonify({"error": "not found"}), 404
+    return jsonify(recipe)
+
+
+@app.route("/api/recipes/<int:recipe_id>", methods=["DELETE"])
+def api_recipe_delete(recipe_id):
+    if delete_recipe(recipe_id):
+        return jsonify({"ok": True})
+    return jsonify({"error": "not found"}), 404
+
+
+@app.route("/api/recipes/<int:recipe_id>/ingredients", methods=["POST"])
+def api_ingredient_add(recipe_id):
+    data = request.get_json()
+    if not data or not data.get("name"):
+        return jsonify({"error": "name required"}), 400
+    ing = add_ingredient(
+        recipe_id,
+        name=data["name"],
+        quantity=data.get("quantity"),
+        unit=data.get("unit"),
+    )
+    if not ing:
+        return jsonify({"error": "recipe not found"}), 404
+    return jsonify(ing), 201
+
+
+@app.route("/api/ingredients/<int:ingredient_id>", methods=["PUT"])
+def api_ingredient_update(ingredient_id):
+    data = request.get_json() or {}
+    ing = update_ingredient(ingredient_id, **data)
+    if not ing:
+        return jsonify({"error": "not found"}), 404
+
+    # If quantity or unit changed, recompute costs for all linked products
+    if "quantity" in data or "unit" in data:
+        products = get_ingredient_products(ingredient_id)
+        updated_products = []
+        for ip in products:
+            if not ing["quantity"] or not ing["unit"]:
+                updated_products.append(ip)
+                continue
+            std_units = json.loads(ip["std_units_json"]) if ip.get("std_units_json") else {}
+            # Rebuild minimal product dict for cost computation
+            product_dict = {
+                "name": ip.get("product_name"),
+                "price": ip.get("product_price"),
+                "size": ip.get("product_size"),
+                "store": ip.get("product_store"),
+                "std_units": std_units,
+            }
+            density = ip.get("density_oz_per_cup")
+            cost = compute_ingredient_cost(
+                recipe_qty=ing["quantity"],
+                recipe_unit=ing["unit"],
+                product=product_dict,
+                ingredient_name=ing["name"],
+                density_override=density,
+            )
+            breakdown = format_ingredient_cost_breakdown(
+                recipe_qty=ing["quantity"],
+                recipe_unit=ing["unit"],
+                product=product_dict,
+                ingredient_name=ing["name"],
+                density_override=density,
+            )
+            update_ingredient_product(ip["id"], ingredient_cost=cost, cost_breakdown=breakdown)
+            ip["ingredient_cost"] = cost
+            ip["cost_breakdown"] = breakdown
+            updated_products.append(ip)
+
+        # Update legacy columns on recipe_ingredients with cheapest
+        costed = [p for p in updated_products if p.get("ingredient_cost") is not None]
+        if costed:
+            cheapest = min(costed, key=lambda p: p["ingredient_cost"])
+            update_ingredient(ingredient_id, ingredient_cost=cheapest["ingredient_cost"],
+                              cost_breakdown=cheapest["cost_breakdown"])
+            ing["ingredient_cost"] = cheapest["ingredient_cost"]
+            ing["cost_breakdown"] = cheapest["cost_breakdown"]
+
+        ing["products"] = updated_products
+
+    return jsonify(ing)
+
+
+@app.route("/api/ingredients/<int:ingredient_id>", methods=["DELETE"])
+def api_ingredient_delete(ingredient_id):
+    if delete_ingredient(ingredient_id):
+        return jsonify({"ok": True})
+    return jsonify({"error": "not found"}), 404
+
+
+@app.route("/api/ingredients/<int:ingredient_id>/link-product", methods=["POST"])
+def api_ingredient_link_product(ingredient_id):
+    """Link a product to an ingredient and compute the cost.
+
+    Expects JSON with a product dict (from search results) that has std_units.
+    Inserts into ingredient_products table (supports multiple products per ingredient).
+    """
+    data = request.get_json()
+    if not data or not data.get("product"):
+        return jsonify({"error": "product required"}), 400
+
+    product = data["product"]
+    ing = update_ingredient(ingredient_id)
+    if not ing:
+        return jsonify({"error": "ingredient not found"}), 404
+
+    # Parse serving size into density (oz per cup)
+    density = None
+    if product.get("serving_size"):
+        density = parse_serving_size_density(product["serving_size"])
+
+    # Compute cost using the cooking conversion layer
+    cost = None
+    breakdown = None
+    if ing["quantity"] and ing["unit"]:
+        cost = compute_ingredient_cost(
+            recipe_qty=ing["quantity"],
+            recipe_unit=ing["unit"],
+            product=product,
+            ingredient_name=ing["name"],
+            density_override=density,
+        )
+        breakdown = format_ingredient_cost_breakdown(
+            recipe_qty=ing["quantity"],
+            recipe_unit=ing["unit"],
+            product=product,
+            ingredient_name=ing["name"],
+            density_override=density,
+        )
+
+    # Build URL from product
+    url = product.get("url")
+    if not url:
+        store = product.get("store", "")
+        pid = product.get("product_id", "")
+        if store == "walmart" and pid:
+            url = f"https://www.walmart.com/ip/{pid}"
+        elif store == "aldi" and pid:
+            url = f"https://new.aldi.us/product/{pid}"
+
+    # Insert into ingredient_products table
+    std_units_json = json.dumps(product.get("std_units", {}))
+    new_product = add_ingredient_product(
+        ingredient_id,
+        product_url=url,
+        product_name=product.get("name"),
+        product_price=product.get("price"),
+        product_size=product.get("size"),
+        product_store=product.get("store"),
+        product_unit_price=product.get("unit_price_string"),
+        ingredient_cost=cost,
+        cost_breakdown=breakdown,
+        density_oz_per_cup=density,
+        std_units_json=std_units_json,
+    )
+
+    # Also update the legacy columns on the ingredient for backward compat
+    update_ingredient(
+        ingredient_id,
+        product_url=url,
+        product_name=product.get("name"),
+        product_price=product.get("price"),
+        product_size=product.get("size"),
+        product_store=product.get("store"),
+        product_unit_price=product.get("unit_price_string"),
+        ingredient_cost=cost,
+        cost_breakdown=breakdown,
+    )
+
+    return jsonify(new_product), 201
+
+
+@app.route("/api/ingredient-products/<int:product_id>", methods=["DELETE"])
+def api_ingredient_product_delete(product_id):
+    if delete_ingredient_product(product_id):
+        return jsonify({"ok": True})
+    return jsonify({"error": "not found"}), 404
+
+
+@app.route("/api/recipes/<int:recipe_id>/recalculate", methods=["POST"])
+def api_recipe_recalculate(recipe_id):
+    """Recalculate all ingredient costs for a recipe.
+
+    For ingredients with linked products, re-fetches current prices and recomputes costs.
+    """
+    recipe = get_recipe(recipe_id)
+    if not recipe:
+        return jsonify({"error": "not found"}), 404
+
+    zip_code = request.args.get("zip", DEFAULT_ZIP).strip() or DEFAULT_ZIP
+
+    for ing in recipe["ingredients"]:
+        if not ing["quantity"] or not ing["unit"]:
+            continue
+
+        # Recalculate all linked products for this ingredient
+        for ip in ing.get("products", []):
+            url = ip.get("product_url")
+            if not url:
+                continue
+
+            product_dict = None
+
+            # Fetch fresh product data
+            if "walmart.com" in url:
+                pid = walmart_extract_id(url)
+                if pid:
+                    try:
+                        p = walmart_scrape_product(pid, zip_code)
+                        if not p.error:
+                            product_dict = {
+                                "name": p.name, "price": p.price,
+                                "unit_price_string": p.unit_price_string,
+                                "store": "walmart", "size": None, "url": p.url,
+                                "serving_size": p.serving_size,
+                            }
+                    except Exception as e:
+                        log.error(f"Recipe recalc - Walmart fetch error for {pid}: {e}")
+            elif "aldi.us" in url:
+                pid = aldi_extract_id(url)
+                if pid:
+                    try:
+                        session = get_aldi_session()
+                        products = aldi_scrape_products([pid], postal_code=zip_code, session=session)
+                        if products and not products[0].error:
+                            p = products[0]
+                            product_dict = {
+                                **asdict(p), "store": "aldi",
+                            }
+                    except Exception as e:
+                        log.error(f"Recipe recalc - Aldi fetch error for {pid}: {e}")
+
+            if product_dict:
+                # Standardize to get std_units
+                all_prods = [product_dict]
+                standardize_unit_prices(ing["name"], all_prods)
+
+                # Extract density from serving size
+                density = None
+                if product_dict.get("serving_size"):
+                    density = parse_serving_size_density(product_dict["serving_size"])
+
+                cost = compute_ingredient_cost(
+                    recipe_qty=ing["quantity"],
+                    recipe_unit=ing["unit"],
+                    product=product_dict,
+                    ingredient_name=ing["name"],
+                    density_override=density,
+                )
+                breakdown = format_ingredient_cost_breakdown(
+                    recipe_qty=ing["quantity"],
+                    recipe_unit=ing["unit"],
+                    product=product_dict,
+                    ingredient_name=ing["name"],
+                    density_override=density,
+                )
+
+                # Update the ingredient_product row
+                conn = __import__('database').get_connection()
+                conn.execute(
+                    "UPDATE ingredient_products SET product_name=?, product_price=?, "
+                    "product_unit_price=?, ingredient_cost=?, cost_breakdown=?, density_oz_per_cup=? WHERE id=?",
+                    (product_dict.get("name"), product_dict.get("price"),
+                     product_dict.get("unit_price_string"), cost, breakdown, density, ip["id"]),
+                )
+                conn.commit()
+                conn.close()
+
+    return jsonify(get_recipe(recipe_id))
+
+
+@app.route("/api/cooking-units", methods=["GET"])
+def api_cooking_units():
+    return jsonify({"units": COOKING_UNITS})
+
+
+init_db()
 
 if __name__ == "__main__":
     import webbrowser
