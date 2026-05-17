@@ -26,9 +26,9 @@ def _get(url: str, timeout: int = 10) -> Optional[str]:
     """Simple GET that returns response text or None."""
     try:
         if HAS_CFFI:
-            resp = cffi_requests.get(url, impersonate="chrome", timeout=timeout)
+            resp = cffi_requests.get(url, impersonate="chrome", timeout=timeout, verify=False)
         else:
-            resp = cffi_requests.get(url, timeout=timeout)
+            resp = cffi_requests.get(url, timeout=timeout, verify=False)
         if resp.status_code != 200:
             log.warning(f"HTTP {resp.status_code} for {url}")
             return None

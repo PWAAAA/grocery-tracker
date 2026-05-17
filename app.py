@@ -31,6 +31,12 @@ from scrapers.walmart import (
     extract_id_from_url as walmart_extract_id,
     find_stores_by_zip,
 )
+from scrapers.amazon import (
+    scrape_search as amazon_search,
+    scrape_product as amazon_scrape_product,
+    extract_id_from_url as amazon_extract_id,
+    find_stores_by_zip as amazon_find_stores,
+)
 from pricing import standardize_results as standardize_unit_prices
 from database import (
     init_db, get_grocery_items, set_grocery_items, classify_item,
@@ -96,6 +102,8 @@ def api_stores():
     try:
         if store_type == "aldi":
             stores = aldi_find_stores(zip_code, session=get_aldi_session())
+        elif store_type == "amazon":
+            stores = amazon_find_stores(zip_code)
         else:
             stores = find_stores_by_zip(zip_code)
         return jsonify({"stores": stores})
@@ -173,10 +181,49 @@ def api_search():
             results["walmart"] = []
             results["walmart_error"] = str(e)
 
+    if "amazon" in stores:
+        try:
+            fresh_only = request.args.get("amazon_fresh", "").strip().lower() == "true"
+            raw = amazon_search(query=q, zip_code=zip_code, limit=limit, fresh_only=fresh_only)
+            # Filter to Prime-eligible only (unless searching Fresh specifically)
+            if not fresh_only:
+                pre_filter = len(raw)
+                raw = [p for p in raw if p.get("is_prime", False)]
+                if pre_filter != len(raw):
+                    log.info(f"Amazon '{q}': filtered {pre_filter - len(raw)}/{pre_filter} non-Prime items")
+            # Sponsored items go last; cap after sorting
+            raw.sort(key=lambda p: bool(p.get("sponsored")))
+            raw = raw[:limit]
+            results["amazon"] = [
+                {
+                    "name": p.get("name"),
+                    "product_id": p.get("product_id"),
+                    "price": p.get("price"),
+                    "price_string": p.get("price_string") or (f"${p['price']:.2f}" if p.get("price") is not None else None),
+                    "unit_price_string": p.get("unit_price_string"),
+                    "image_url": p.get("image"),
+                    "url": p.get("url"),
+                    "store": "amazon",
+                    "in_stock": True,
+                    "brand": None,
+                    "size": None,
+                    "serving_size": None,
+                    "sponsored": p.get("sponsored", False),
+                    "is_prime": p.get("is_prime", False),
+                    "is_fresh": p.get("is_fresh", False),
+                }
+                for p in raw
+            ]
+            log.info(f"Amazon '{q}': returning {len(results['amazon'])} results")
+        except Exception as e:
+            log.error(f"Amazon search error: {e}")
+            results["amazon"] = []
+            results["amazon_error"] = str(e)
+
     # Standardize unit prices across all stores in one pass so a single
     # toggle covers the whole query block. Mutates each product to add
     # `std_units`; one `unit_meta` covers everything.
-    all_products = list(results.get("aldi") or []) + list(results.get("walmart") or [])
+    all_products = list(results.get("aldi") or []) + list(results.get("walmart") or []) + list(results.get("amazon") or [])
     meta = standardize_unit_prices(q, all_products)
     default_key = meta["unit_default"]
     if default_key:
@@ -221,6 +268,7 @@ def api_fetch_links():
     # Group links by store
     walmart_links = [l for l in links if "walmart.com" in l]
     aldi_links = [l for l in links if "aldi.us" in l]
+    amazon_links = [l for l in links if "amazon.com" in l]
 
     # Fetch Walmart products
     for link in walmart_links:
@@ -274,7 +322,34 @@ def api_fetch_links():
         except Exception as e:
             log.error(f"Error fetching Aldi products: {e}")
 
-    return jsonify({"products": results})
+    # Fetch Amazon products
+    for link in amazon_links:
+        pid = amazon_extract_id(link)
+        if not pid:
+            log.warning(f"Could not extract Amazon ASIN from: {link}")
+            continue
+        try:
+            product = amazon_scrape_product(pid, zip_code)
+            if product.error:
+                log.warning(f"Amazon product {pid}: {product.error}")
+                continue
+            results.append({
+                **asdict(product),
+                "store": "amazon",
+            })
+        except Exception as e:
+            log.error(f"Error fetching Amazon product {pid}: {e}")
+
+    # Standardize unit prices so fetched products get std_units like search results
+    meta = standardize_unit_prices("", results)
+    default_key = meta["unit_default"]
+    if default_key:
+        for p in results:
+            std = p.get("std_units") or {}
+            if default_key in std:
+                p["unit_price_string"] = std[default_key]["string"]
+
+    return jsonify({"products": results, "unit_meta": meta})
 
 
 # ── Recipe endpoints ───────────────────────────────────────────────
@@ -303,6 +378,7 @@ def api_recipe_get(recipe_id):
     recipe = get_recipe(recipe_id)
     if not recipe:
         return jsonify({"error": "not found"}), 404
+
     return jsonify(recipe)
 
 
@@ -458,6 +534,8 @@ def api_ingredient_link_product(ingredient_id):
             url = f"https://www.walmart.com/ip/{pid}"
         elif store == "aldi" and pid:
             url = f"https://new.aldi.us/product/{pid}"
+        elif store == "amazon" and pid:
+            url = f"https://www.amazon.com/dp/{pid}"
 
     # Insert into ingredient_products table
     std_units_json = json.dumps(product.get("std_units", {}))
@@ -550,6 +628,20 @@ def api_recipe_recalculate(recipe_id):
                             }
                     except Exception as e:
                         log.error(f"Recipe recalc - Aldi fetch error for {pid}: {e}")
+            elif "amazon.com" in url:
+                pid = amazon_extract_id(url)
+                if pid:
+                    try:
+                        p = amazon_scrape_product(pid, zip_code)
+                        if not p.error:
+                            product_dict = {
+                                "name": p.name, "price": p.price,
+                                "unit_price_string": p.unit_price_string,
+                                "store": "amazon", "size": p.size, "url": p.url,
+                                "serving_size": p.serving_size,
+                            }
+                    except Exception as e:
+                        log.error(f"Recipe recalc - Amazon fetch error for {pid}: {e}")
 
             if product_dict:
                 # Standardize to get std_units

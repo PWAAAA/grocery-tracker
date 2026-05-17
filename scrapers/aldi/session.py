@@ -67,6 +67,7 @@ class AldiSession:
 
     def __init__(self):
         self.session = requests.Session()
+        self.session.verify = False
         self.session.headers.update({
             "User-Agent": random.choice(USER_AGENTS),
             "Accept-Language": "en-US,en;q=0.9",

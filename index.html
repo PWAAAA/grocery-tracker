@@ -14,6 +14,8 @@
       --aldi-color:    #1e3a5f;
       --walmart-bg:    #e0f2fe;
       --walmart-color: #004c97;
+      --amazon-bg:     #fef3c7;
+      --amazon-color:  #92400e;
       --bg:            #f1f5f9;
       --card:          #ffffff;
       --border:        #e2e8f0;
@@ -249,6 +251,7 @@
     }
     .store-badge.aldi    { background: var(--aldi-bg);    color: var(--aldi-color); }
     .store-badge.walmart { background: var(--walmart-bg); color: var(--walmart-color); }
+    .store-badge.amazon  { background: var(--amazon-bg);  color: var(--amazon-color); }
 
     /* ── Price comparison ─────────────────────────────────── */
     .comparison-card {
@@ -361,25 +364,36 @@
     /* ── Recipe UI ──────────────────────────────────────── */
     .recipe-overlay {
       display: none; position: fixed; inset: 0; z-index: 200;
-      background: rgba(0,0,0,.35); align-items: center; justify-content: center;
+      background: rgba(0,0,0,.35);
     }
-    .recipe-overlay.open { display: flex; }
+    .recipe-overlay.open { display: block; }
 
     .recipe-modal {
+      position: absolute;
       background: var(--card); border-radius: 14px; width: 480px; max-width: 95vw;
-      max-height: 75vh; display: flex; flex-direction: column;
+      max-height: 90vh; min-width: 280px; min-height: 200px;
+      display: flex; flex-direction: column;
       box-shadow: 0 12px 40px rgba(0,0,0,.2);
+      resize: both; overflow: hidden;
+      container-type: inline-size; container-name: recipe-modal;
     }
     .recipe-modal-header {
       display: flex; align-items: center; justify-content: space-between;
       padding: 14px 18px; border-bottom: 1px solid var(--border); flex-shrink: 0;
+      cursor: grab;
     }
+    .recipe-modal-header:active { cursor: grabbing; }
     .recipe-modal-header h3 { font-size: .95rem; font-weight: 700; }
     .recipe-modal-close {
       background: none; border: none; cursor: pointer; font-size: 1.3rem;
       color: var(--muted); line-height: 1; padding: 0 2px;
     }
     .recipe-modal-close:hover { color: var(--danger); }
+    .recipe-modal-reset {
+      background: none; border: none; cursor: pointer; font-size: 1.1rem;
+      color: var(--muted); line-height: 1; padding: 0 2px;
+    }
+    .recipe-modal-reset:hover { color: var(--primary); }
     .recipe-modal-body { flex: 1; overflow-y: auto; padding: 8px 0; }
     .recipe-modal-footer {
       padding: 12px 18px; border-top: 1px solid var(--border); flex-shrink: 0;
@@ -398,6 +412,7 @@
     .recipe-list-item:hover { background: #f8fafc; }
     .recipe-list-item .rli-name { font-weight: 600; }
     .recipe-list-item .rli-cost { font-size: .78rem; color: var(--muted); }
+    .recipe-list-item .rli-pipe { color: var(--muted); margin: 0 2px; }
     .recipe-list-item .rli-remove {
       background: none; border: none; cursor: pointer; color: var(--muted);
       font-size: 1rem; line-height: 1; padding: 0 2px;
@@ -414,6 +429,19 @@
       font-size: 1.4rem; color: #94a3b8;
     }
     .recipe-empty { text-align: center; color: var(--muted); padding: 28px 16px; font-size: .82rem; }
+
+    @container recipe-modal (min-width: 600px) {
+      .recipe-list-item { padding: 14px 22px; font-size: .92rem; gap: 16px; }
+      .recipe-list-item .rli-name { font-size: 1rem; }
+      .recipe-list-item .rli-cost { font-size: .86rem; }
+      .rli-image, .rli-image-placeholder { width: 80px; height: 80px; }
+    }
+    @container recipe-modal (min-width: 800px) {
+      .recipe-list-item { padding: 18px 28px; font-size: 1rem; gap: 20px; }
+      .recipe-list-item .rli-name { font-size: 1.1rem; }
+      .recipe-list-item .rli-cost { font-size: .92rem; }
+      .rli-image, .rli-image-placeholder { width: 96px; height: 96px; font-size: 1.8rem; }
+    }
 
     /* Recipe editor (shown in main panel) */
     .recipe-editor {
@@ -655,7 +683,40 @@
       .recipe-hero-image { max-height: 180px; }
       .recipe-hero-placeholder { height: 80px; }
     }
+    .recipe-notes-section {
+      margin-top: 16px; border-top: 1px solid var(--border); padding-top: 12px;
+    }
+    .recipe-notes-header {
+      display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;
+    }
+    .recipe-notes-header h3 { margin: 0; font-size: .85rem; color: var(--muted); }
+    .recipe-notes-toggle {
+      font-size: .72rem; padding: 2px 8px; border: 1px solid var(--border);
+      border-radius: 4px; background: #fff; cursor: pointer;
+    }
+    .recipe-notes-toggle:hover { background: #f5f5f5; }
+    .recipe-notes-textarea {
+      width: 100%; min-height: 120px; padding: 10px; border: 1px solid var(--border);
+      border-radius: 6px; font-family: 'Consolas', 'Monaco', monospace; font-size: .8rem;
+      resize: vertical; outline: none; box-sizing: border-box;
+    }
+    .recipe-notes-textarea:focus { border-color: var(--primary); }
+    .recipe-notes-preview {
+      padding: 10px 12px; border: 1px solid var(--border); border-radius: 6px;
+      font-size: .82rem; min-height: 40px; background: #fafbfc;
+    }
+    .recipe-notes-preview h1 { font-size: 1.2rem; margin: .5em 0 .3em; }
+    .recipe-notes-preview h2 { font-size: 1.05rem; margin: .5em 0 .3em; }
+    .recipe-notes-preview h3 { font-size: .95rem; margin: .5em 0 .3em; }
+    .recipe-notes-preview p { margin: .4em 0; }
+    .recipe-notes-preview ul, .recipe-notes-preview ol { margin: .4em 0; padding-left: 1.5em; }
+    .recipe-notes-preview code { background: #e5e7eb; padding: 1px 4px; border-radius: 3px; font-size: .8em; }
+    .recipe-notes-preview pre { background: #e5e7eb; padding: 8px; border-radius: 5px; overflow-x: auto; }
+    .recipe-notes-preview pre code { background: none; padding: 0; }
+    .recipe-notes-preview blockquote { border-left: 3px solid var(--border); margin: .4em 0; padding-left: 10px; color: var(--muted); }
+    .recipe-notes-empty { color: var(--muted); font-size: .78rem; font-style: italic; }
   </style>
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 </head>
 <body>
 
@@ -673,6 +734,9 @@
       </label>
       <label class="store-toggle">
         <input type="checkbox" id="chkWalmart" checked> Walmart
+      </label>
+      <label class="store-toggle">
+        <input type="checkbox" id="chkAmazon" checked> Amazon
       </label>
     </div>
     <div class="header-field" id="walmartStoreField">
@@ -783,10 +847,13 @@
 
 <!-- ── Recipe list modal ── -->
 <div class="recipe-overlay" id="recipeOverlay" onclick="if(event.target===this)toggleRecipeModal()">
-  <div class="recipe-modal">
+  <div class="recipe-modal" id="recipeModal">
     <div class="recipe-modal-header">
       <h3>Recipes</h3>
-      <button class="recipe-modal-close" onclick="toggleRecipeModal()">&times;</button>
+      <div style="display:flex;align-items:center;gap:6px;">
+        <button class="recipe-modal-reset" onclick="resetRecipeModal()" title="Reset size &amp; position">&#x21ba;</button>
+        <button class="recipe-modal-close" onclick="toggleRecipeModal()">&times;</button>
+      </div>
     </div>
     <div class="recipe-modal-body" id="recipeModalBody">
       <div class="recipe-empty">No recipes yet.</div>
@@ -843,6 +910,7 @@
     const s = [];
     if (document.getElementById('chkAldi').checked)    s.push('aldi');
     if (document.getElementById('chkWalmart').checked) s.push('walmart');
+    if (document.getElementById('chkAmazon').checked)  s.push('amazon');
     return s;
   }
 
@@ -951,6 +1019,7 @@
   }
   document.getElementById('chkAldi').addEventListener('change', updateStoreFieldVisibility);
   document.getElementById('chkWalmart').addEventListener('change', updateStoreFieldVisibility);
+  document.getElementById('chkAmazon').addEventListener('change', updateStoreFieldVisibility);
   updateStoreFieldVisibility();
 
   async function refreshResults() {
@@ -1021,7 +1090,7 @@
       if (data.error) { renderQueryBlock(query, { error: data.error }); return; }
 
       const products = [];
-      for (const store of ['aldi', 'walmart']) {
+      for (const store of ['aldi', 'walmart', 'amazon']) {
         if (data[store]) products.push(...data[store].map(p => ({ ...p, store, searchQuery: query })));
       }
 
@@ -1260,7 +1329,7 @@
     if (!val) return;
     if (state.grocery.some(g => g.value === val)) return;
     const item = val.startsWith('http')
-      ? { type: 'link', store: val.includes('walmart.com') ? 'walmart' : val.includes('aldi.us') ? 'aldi' : 'unknown', value: val }
+      ? { type: 'link', store: val.includes('walmart.com') ? 'walmart' : val.includes('aldi.us') ? 'aldi' : val.includes('amazon.com') ? 'amazon' : 'unknown', value: val }
       : { type: 'search', value: val };
     state.grocery.push(item);
     if (!value) input.value = '';
@@ -1378,6 +1447,8 @@
       url = `https://www.walmart.com/ip/${p.product_id}`;
     } else if (p.store === 'aldi' && p.product_id) {
       url = `https://new.aldi.us/product/${p.product_id}`;
+    } else if (p.store === 'amazon' && p.product_id) {
+      url = `https://www.amazon.com/dp/${p.product_id}`;
     }
     if (!url) return;
     addToList(url);
@@ -1635,8 +1706,49 @@
   ];
 
   function toggleRecipeModal() {
-    document.getElementById('recipeOverlay').classList.toggle('open');
+    const overlay = document.getElementById('recipeOverlay');
+    const modal = document.getElementById('recipeModal');
+    overlay.classList.toggle('open');
+    if (overlay.classList.contains('open')) {
+      // Center the modal in the viewport
+      modal.style.left = Math.max(0, (window.innerWidth - modal.offsetWidth) / 2) + 'px';
+      modal.style.top = Math.max(0, (window.innerHeight - modal.offsetHeight) / 2) + 'px';
+    }
   }
+
+  function resetRecipeModal() {
+    const modal = document.getElementById('recipeModal');
+    modal.style.width = '';
+    modal.style.height = '';
+    modal.style.left = Math.max(0, (window.innerWidth - 480) / 2) + 'px';
+    modal.style.top = Math.max(0, (window.innerHeight - modal.offsetHeight) / 2) + 'px';
+  }
+
+  // Drag recipe modal by header
+  (function() {
+    const modal = document.getElementById('recipeModal');
+    const header = modal.querySelector('.recipe-modal-header');
+    let dragging = false, startX, startY, startLeft, startTop;
+
+    header.addEventListener('mousedown', (e) => {
+      if (e.target.closest('button')) return;
+      dragging = true;
+      startX = e.clientX; startY = e.clientY;
+      const rect = modal.getBoundingClientRect();
+      startLeft = rect.left; startTop = rect.top;
+      document.body.style.userSelect = 'none';
+    });
+    document.addEventListener('mousemove', (e) => {
+      if (!dragging) return;
+      modal.style.left = (startLeft + e.clientX - startX) + 'px';
+      modal.style.top = (startTop + e.clientY - startY) + 'px';
+    });
+    document.addEventListener('mouseup', () => {
+      if (!dragging) return;
+      dragging = false;
+      document.body.style.userSelect = '';
+    });
+  })();
 
   async function loadRecipes() {
     try {
@@ -1661,8 +1773,8 @@
             ? `<img class="rli-image" src="${esc(r.image_url)}" alt="">`
             : `<div class="rli-image-placeholder">&#127869;</div>`}
           <div style="flex:1;min-width:0;">
-            <div class="rli-name">${esc(r.name)}</div>
-            <div class="rli-cost">${r.servings} serving${r.servings !== 1 ? 's' : ''}</div>
+            <div class="rli-name">${esc(r.name)}${r.recipe_cost > 0 ? ` <span class="rli-pipe">|</span> $${r.recipe_cost.toFixed(2)}` : ''}</div>
+            <div class="rli-cost">${r.servings} serving${r.servings !== 1 ? 's' : ''}${r.recipe_cost > 0 ? ` | $${r.cost_per_serving.toFixed(2)} per serving | $${r.shelf_price.toFixed(2)} shelf price` : ''}</div>
           </div>
           <button class="rli-remove" onclick="event.stopPropagation(); deleteRecipeConfirm(${r.id})" title="Delete">&#215;</button>
         </div>
@@ -1707,8 +1819,20 @@
       const resp = await fetch(`/api/recipes/${id}`);
       recipeState.editing = await resp.json();
       recipeState.ingredientSearch = {};
+      recipeState.ingredientSortMode = 'position';
+      recipeState.notesMode = 'view';
       renderRecipeEditor();
     } catch (e) { console.error('Failed to load recipe:', e); }
+  }
+
+  function sortRecipeIngredients(mode) {
+    recipeState.ingredientSortMode = mode;
+    renderRecipeEditor();
+  }
+
+  function toggleNotesMode() {
+    recipeState.notesMode = recipeState.notesMode === 'edit' ? 'view' : 'edit';
+    renderRecipeEditor();
   }
 
   function closeRecipeEditor() {
@@ -1767,6 +1891,15 @@
         </div>
         ` : ''}
 
+        <div style="display:flex;justify-content:flex-end;padding:4px 0;">
+          <select style="font-size:.72rem;padding:2px 6px;border:1px solid var(--border);border-radius:4px;"
+                  onchange="sortRecipeIngredients(this.value)">
+            <option value="position" ${(recipeState.ingredientSortMode||'position')==='position'?'selected':''}>Sort: Position</option>
+            <option value="cost_asc" ${recipeState.ingredientSortMode==='cost_asc'?'selected':''}>Sort: Cost (low→high)</option>
+            <option value="cost_desc" ${recipeState.ingredientSortMode==='cost_desc'?'selected':''}>Sort: Cost (high→low)</option>
+          </select>
+        </div>
+
         <table class="ingredient-table">
           <thead>
             <tr>
@@ -1779,7 +1912,18 @@
             </tr>
           </thead>
           <tbody>
-            ${r.ingredients.map(ing => ingredientRowHTML(ing, unitOptions)).join('')}
+            ${(() => {
+              let sortedIngs = [...r.ingredients];
+              const sortMode = recipeState.ingredientSortMode || 'position';
+              if (sortMode === 'cost_asc' || sortMode === 'cost_desc') {
+                sortedIngs.sort((a, b) => {
+                  const aCost = (a.products || []).find(p => p.ingredient_cost != null)?.ingredient_cost ?? Infinity;
+                  const bCost = (b.products || []).find(p => p.ingredient_cost != null)?.ingredient_cost ?? Infinity;
+                  return sortMode === 'cost_asc' ? aCost - bCost : bCost - aCost;
+                });
+              }
+              return sortedIngs.map(ing => ingredientRowHTML(ing, unitOptions)).join('');
+            })()}
           </tbody>
         </table>
 
@@ -1787,6 +1931,21 @@
           <input type="text" id="newIngredientInput" placeholder="Add ingredient (e.g. chicken thigh, white rice)…"
                  onkeydown="if(event.key==='Enter') addIngredientFromInput()">
           <button class="btn btn-sm btn-primary" onclick="addIngredientFromInput()">+ Add</button>
+        </div>
+
+        <div class="recipe-notes-section">
+          <div class="recipe-notes-header">
+            <h3>Notes</h3>
+            <button class="recipe-notes-toggle" onclick="toggleNotesMode()">
+              ${recipeState.notesMode === 'edit' ? 'View' : 'Edit'}
+            </button>
+          </div>
+          ${recipeState.notesMode === 'edit'
+            ? `<textarea class="recipe-notes-textarea" placeholder="Add notes (supports Markdown)…"
+                         oninput="updateRecipeField('notes', this.value)">${esc(r.notes || '')}</textarea>`
+            : (r.notes
+              ? `<div class="recipe-notes-view">${marked.parse(r.notes)}</div>`
+              : `<div class="recipe-notes-empty">No notes yet — click Edit to add some.</div>`)}
         </div>
       </div>
     `;
@@ -1803,7 +1962,9 @@
         <div class="ing-product-info" style="margin-bottom:4px;padding:4px 0;border-bottom:1px solid var(--border);">
           <div class="ing-product-name">
             ${p.product_store ? `<span class="store-badge ${esc(p.product_store)}">${esc(p.product_store.toUpperCase())}</span> ` : ''}
-            ${esc(p.product_name || '')}
+            ${p.product_url
+              ? `<a href="${esc(p.product_url)}" target="_blank" rel="noopener" style="color:inherit;text-decoration:underline dotted;">${esc(p.product_name || '')}</a>`
+              : esc(p.product_name || '')}
             <button onclick="removeIngredientProduct(${p.id})" style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:.8rem;padding:0 3px;" title="Remove product">×</button>
           </div>
           <div class="ing-product-meta">
@@ -1923,7 +2084,7 @@
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ [field]: value }),
         });
-        renderRecipeEditor();
+        if (field !== 'notes') renderRecipeEditor();
       } catch (e) { console.error('Failed to update recipe:', e); }
     }, 500);
   }
@@ -2000,7 +2161,7 @@
       const resp = await fetch(url);
       const data = await resp.json();
       const products = [];
-      for (const store of ['aldi', 'walmart']) {
+      for (const store of ['aldi', 'walmart', 'amazon']) {
         if (data[store]) products.push(...data[store]);
       }
       recipeState.ingredientSearch[ingId] = { loading: false, results: products, query: name, unitMeta: data.unit_meta || {} };

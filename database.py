@@ -156,8 +156,29 @@ def set_grocery_items(items: list[dict]):
 def get_recipes() -> list[dict]:
     conn = get_connection()
     rows = conn.execute("SELECT id, name, servings, notes, image_url FROM recipes ORDER BY position").fetchall()
+    recipes = []
+    for row in rows:
+        r = dict(row)
+        costs = conn.execute(
+            """SELECT ri.id,
+                      MIN(ip.ingredient_cost) as cheapest_cost,
+                      (SELECT ip2.product_price FROM ingredient_products ip2
+                       WHERE ip2.ingredient_id = ri.id
+                       ORDER BY ip2.ingredient_cost ASC NULLS LAST, ip2.position LIMIT 1) as shelf_price
+               FROM recipe_ingredients ri
+               LEFT JOIN ingredient_products ip ON ip.ingredient_id = ri.id
+               WHERE ri.recipe_id = ?
+               GROUP BY ri.id""",
+            (r["id"],),
+        ).fetchall()
+        recipe_cost = sum(c["cheapest_cost"] for c in costs if c["cheapest_cost"] is not None)
+        shelf_total = sum(c["shelf_price"] for c in costs if c["shelf_price"] is not None)
+        r["recipe_cost"] = recipe_cost
+        r["shelf_price"] = shelf_total
+        r["cost_per_serving"] = recipe_cost / r["servings"] if r["servings"] and r["servings"] > 0 else 0
+        recipes.append(r)
     conn.close()
-    return [dict(row) for row in rows]
+    return recipes
 
 
 def get_recipe(recipe_id: int) -> dict | None:
