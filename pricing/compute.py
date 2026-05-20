@@ -15,7 +15,10 @@ from .constants import (
 )
 from .containers import detect_container_label
 from .dimension import pick_dimension, product_dimension
-from .parsing import parse_native_per_100, parse_native_unit_price, parse_pack_size_combined, parse_priced_per_unit
+from .parsing import (
+    parse_native_per_100, parse_native_unit_price, parse_pack_size_combined,
+    parse_pack_size_with_positions, parse_priced_per_unit,
+)
 
 
 def total_count(pack: list[tuple[float, str]]) -> Optional[float]:
@@ -36,13 +39,32 @@ def total_count(pack: list[tuple[float, str]]) -> Optional[float]:
     return qty if has else None
 
 
-def total_in_dimension(pack: list[tuple[float, str]], dimension: str) -> Optional[float]:
+def total_in_dimension(pack: list[tuple[float, str]], dimension: str,
+                       name: Optional[str] = None) -> Optional[float]:
     """Sum a parsed pack into the canonical unit of the requested dimension.
 
-    Multipack handling: if a product has BOTH a count and a volume/weight,
-    we multiply (e.g., '12 pack 12 fl oz' -> 12 * 12 = 144 fl oz). This is
-    the standard "X pack of Y" convention in Walmart names.
+    Multipack handling uses word order from the product name to decide
+    whether count/pack units multiply the weight/volume:
+
+    - "12 pack 12 fl oz" — count BEFORE size → multiply (12 * 12 fl oz = 144)
+    - "36 oz, 8 Pack" — size BEFORE count → total weight, don't multiply
+    - "3 lbs, 12 Count" — size BEFORE count → total weight, don't multiply
+
+    When no name is given (can't check order), falls back to not multiplying
+    to avoid overestimating.
     """
+    if dimension == "count":
+        total = 1.0
+        found = False
+        for qty, unit in pack:
+            if UNIT_DIMENSION.get(unit) == "count":
+                total *= qty * DOZEN_MULTIPLIER.get(unit, 1)
+                found = True
+        return total if found else None
+
+    # Determine if count/pack should multiply weight/volume using word order
+    multiply = _should_multiply_count(name, dimension) if name else False
+
     count_qty = 1.0
     has_count = False
     canon_values: list[float] = []
@@ -58,21 +80,59 @@ def total_in_dimension(pack: list[tuple[float, str]], dimension: str) -> Optiona
         elif dimension == "weight" and unit in WEIGHT_TO_OZ:
             canon_values.append(qty * WEIGHT_TO_OZ[unit])
 
-    if dimension == "count":
-        return count_qty if has_count else None
-
     if not canon_values:
         return None
 
     # Deduplicate near-equivalent entries (same size expressed in different units,
     # e.g. "1L, 946mL (33.8 fl oz)" — all represent the same volume).
-    if not has_count and len(canon_values) > 1:
+    if (not has_count or not multiply) and len(canon_values) > 1:
         mn, mx = min(canon_values), max(canon_values)
         canon_total = mx if (mn > 0 and mx / mn < 1.10) else sum(canon_values)
     else:
         canon_total = sum(canon_values)
 
-    return canon_total * count_qty if has_count else canon_total
+    return canon_total * count_qty if (has_count and multiply) else canon_total
+
+
+def _should_multiply_count(name: str, dimension: str) -> bool:
+    """Decide whether count/pack units should multiply weight/volume.
+
+    Uses word order AND unit type to distinguish multipacks from item counts:
+
+    - "12 pack 12 fl oz" → True (count before per-item oz/fl oz)
+    - "36 oz, 8 Pack"    → False (size before count)
+    - "3 lbs, 12 Count"  → False (size before count)
+    - "12 Count, 4 lb"   → False (lb after count = total weight, not per-item)
+    - "18 Count, 1 oz"   → True (small oz after count = per-item size)
+    """
+    positioned = parse_pack_size_with_positions(name)
+    if not positioned:
+        return False
+
+    first_count_pos = None
+    first_size_pos = None
+    first_size_unit = None
+
+    for qty, unit, pos in positioned:
+        dim = UNIT_DIMENSION.get(unit)
+        if dim == "count" and first_count_pos is None:
+            first_count_pos = pos
+        elif dim in ("weight", "volume") and first_size_pos is None:
+            first_size_pos = pos
+            first_size_unit = unit
+
+    if first_count_pos is None or first_size_pos is None:
+        return False
+
+    # Size appears before count → "36 oz, 8 Pack" → total, don't multiply
+    if first_size_pos < first_count_pos:
+        return False
+
+    # Count appears before size: multiply only for per-item sized units
+    # (oz, fl oz, ml, gram). Larger units (pound, gallon, liter, kg) after
+    # a count are almost always total package weight, not per-item.
+    per_item_units = {"ounce", "fl oz", "ml", "gram"}
+    return first_size_unit in per_item_units
 
 
 def _fmt_money_per(value: float, suffix: str) -> str:
@@ -175,8 +235,11 @@ def compute_unit_reps(
     # --- volume ---
     # Prefer price/size over native unit price to avoid rounding errors
     # (e.g. native "$0.02/fl oz" * 128 = $2.56 instead of actual $2.90/gal)
+    # Use combined name+size for position check (size info may also be in name)
+    name_for_order = f"{name or ''} {size or ''}".strip() or None
+
     per_floz: Optional[float] = None
-    vol = total_in_dimension(pack, "volume")
+    vol = total_in_dimension(pack, "volume", name_for_order)
     if vol and vol > 0:
         per_floz = price / vol
     elif native and native[1] in VOLUME_TO_FLOZ:
@@ -188,7 +251,7 @@ def compute_unit_reps(
 
     # --- weight ---
     per_oz: Optional[float] = None
-    wt = total_in_dimension(pack, "weight")
+    wt = total_in_dimension(pack, "weight", name_for_order)
     if wt and wt > 0:
         per_oz = price / wt
     elif native and native[1] in WEIGHT_TO_OZ and prod_dim == "weight":

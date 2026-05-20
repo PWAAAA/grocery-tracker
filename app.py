@@ -37,6 +37,13 @@ from scrapers.amazon import (
     extract_id_from_url as amazon_extract_id,
     find_stores_by_zip as amazon_find_stores,
 )
+from scrapers.publix import (
+    scrape_search as publix_search,
+    scrape_product as publix_scrape_product,
+    extract_id_from_url as publix_extract_id,
+    find_stores_by_zip as publix_find_stores,
+    PublixSession,
+)
 from pricing import standardize_results as standardize_unit_prices
 from database import (
     init_db, get_grocery_items, set_grocery_items, classify_item,
@@ -44,6 +51,8 @@ from database import (
     add_ingredient, update_ingredient, delete_ingredient,
     add_ingredient_product, delete_ingredient_product, get_ingredient_products,
     update_ingredient_product,
+    get_all_publix_base_prices, get_publix_base_price,
+    get_publix_unknown_prices,
 )
 from pricing.cooking import compute_ingredient_cost, format_ingredient_cost_breakdown, COOKING_UNITS
 from pricing.serving_size import parse_serving_size_density
@@ -64,6 +73,19 @@ def get_aldi_session() -> AldiSession:
         if _aldi_session is None:
             _aldi_session = AldiSession()
     return _aldi_session
+
+
+# Shared Publix session — reused across requests (curl_cffi with Akamai warmup).
+_publix_session: PublixSession | None = None
+_publix_session_lock = threading.Lock()
+
+
+def get_publix_session() -> PublixSession:
+    global _publix_session
+    with _publix_session_lock:
+        if _publix_session is None:
+            _publix_session = PublixSession()
+    return _publix_session
 
 
 @app.route("/")
@@ -104,6 +126,8 @@ def api_stores():
             stores = aldi_find_stores(zip_code, session=get_aldi_session())
         elif store_type == "amazon":
             stores = amazon_find_stores(zip_code)
+        elif store_type == "publix":
+            stores = publix_find_stores(zip_code, session=get_publix_session())
         else:
             stores = find_stores_by_zip(zip_code)
         return jsonify({"stores": stores})
@@ -220,10 +244,50 @@ def api_search():
             results["amazon"] = []
             results["amazon_error"] = str(e)
 
+    if "publix" in stores:
+        try:
+            publix_store_id = request.args.get("publix_store_id", "").strip() or None
+            session = get_publix_session()
+            raw = publix_search(query=q, zip_code=zip_code, store_id=publix_store_id,
+                                session=session, limit=limit)
+            results["publix"] = [
+                {
+                    "name": p.get("name"),
+                    "product_id": p.get("product_id"),
+                    "price": p.get("price"),
+                    "price_string": p.get("price_string"),
+                    "unit_price_string": p.get("unit_price_string"),
+                    "image_url": p.get("image_url") or p.get("image"),
+                    "url": p.get("url"),
+                    "store": "publix",
+                    "in_stock": p.get("in_stock", True),
+                    "brand": p.get("brand"),
+                    "size": p.get("size"),
+                    "serving_size": p.get("serving_size"),
+                    "sponsored": False,
+                    "is_bogo": p.get("is_bogo", False),
+                    "bogo_price": p.get("bogo_price"),
+                    "deal_text": p.get("deal_text"),
+                    "deal": p.get("deal"),
+                    "saving_type": p.get("saving_type"),
+                    "coupon_text": p.get("coupon_text"),
+                    "coupon_value": p.get("coupon_value"),
+                    "coupon_min_qty": p.get("coupon_min_qty"),
+                    "coupon_price": p.get("coupon_price"),
+                }
+                for p in raw
+            ]
+            log.info(f"Publix '{q}': returning {len(results['publix'])} results")
+        except Exception as e:
+            log.error(f"Publix search error: {e}")
+            results["publix"] = []
+            results["publix_error"] = str(e)
+
     # Standardize unit prices across all stores in one pass so a single
     # toggle covers the whole query block. Mutates each product to add
     # `std_units`; one `unit_meta` covers everything.
-    all_products = list(results.get("aldi") or []) + list(results.get("walmart") or []) + list(results.get("amazon") or [])
+    all_products = (list(results.get("aldi") or []) + list(results.get("walmart") or [])
+                    + list(results.get("amazon") or []) + list(results.get("publix") or []))
     meta = standardize_unit_prices(q, all_products)
     default_key = meta["unit_default"]
     if default_key:
@@ -269,6 +333,7 @@ def api_fetch_links():
     walmart_links = [l for l in links if "walmart.com" in l]
     aldi_links = [l for l in links if "aldi.us" in l]
     amazon_links = [l for l in links if "amazon.com" in l]
+    publix_links = [l for l in links if "publix.com" in l]
 
     # Fetch Walmart products
     for link in walmart_links:
@@ -339,6 +404,20 @@ def api_fetch_links():
             })
         except Exception as e:
             log.error(f"Error fetching Amazon product {pid}: {e}")
+
+    # Fetch Publix products
+    for link in publix_links:
+        pid = publix_extract_id(link)
+        if not pid:
+            log.warning(f"Could not extract Publix product ID from: {link}")
+            continue
+        try:
+            session = get_publix_session()
+            product = publix_scrape_product(pid, zip_code, session=session)
+            if product:
+                results.append(product)
+        except Exception as e:
+            log.error(f"Error fetching Publix product {pid}: {e}")
 
     # Standardize unit prices so fetched products get std_units like search results
     meta = standardize_unit_prices("", results)
@@ -536,6 +615,8 @@ def api_ingredient_link_product(ingredient_id):
             url = f"https://new.aldi.us/product/{pid}"
         elif store == "amazon" and pid:
             url = f"https://www.amazon.com/dp/{pid}"
+        elif store == "publix" and pid:
+            url = f"https://www.publix.com/pd/{pid}"
 
     # Insert into ingredient_products table
     std_units_json = json.dumps(product.get("std_units", {}))
@@ -642,6 +723,22 @@ def api_recipe_recalculate(recipe_id):
                             }
                     except Exception as e:
                         log.error(f"Recipe recalc - Amazon fetch error for {pid}: {e}")
+            elif "publix.com" in url:
+                pid = publix_extract_id(url)
+                if pid:
+                    try:
+                        session = get_publix_session()
+                        p = publix_scrape_product(pid, zip_code, session=session)
+                        if p:
+                            product_dict = {
+                                "name": p.get("name"), "price": p.get("price"),
+                                "unit_price_string": p.get("unit_price_string"),
+                                "store": "publix", "size": p.get("size"),
+                                "url": p.get("url"),
+                                "serving_size": p.get("serving_size"),
+                            }
+                    except Exception as e:
+                        log.error(f"Recipe recalc - Publix fetch error for {pid}: {e}")
 
             if product_dict:
                 # Standardize to get std_units
@@ -685,6 +782,34 @@ def api_recipe_recalculate(recipe_id):
 @app.route("/api/cooking-units", methods=["GET"])
 def api_cooking_units():
     return jsonify({"units": COOKING_UNITS})
+
+
+@app.route("/api/publix-base-prices", methods=["GET"])
+def api_publix_base_prices():
+    """Return stored Publix base prices. Optional ?name= or ?product_id= filter."""
+    name = request.args.get("name", "").strip()
+    product_id = request.args.get("product_id", "").strip()
+    brand = request.args.get("brand", "").strip() or None
+
+    if name or product_id:
+        result = get_publix_base_price(
+            name=name or None,
+            brand=brand,
+            product_id=product_id or None,
+        )
+        return jsonify(result)
+
+    return jsonify(get_all_publix_base_prices())
+
+
+@app.route("/api/publix-unknown-prices", methods=["GET"])
+def api_publix_unknown_prices():
+    """Return Publix deal items where base price could not be determined.
+
+    Optional ?reason= filter. Includes URLs for manual inspection.
+    """
+    reason = request.args.get("reason", "").strip() or None
+    return jsonify(get_publix_unknown_prices(reason))
 
 
 init_db()

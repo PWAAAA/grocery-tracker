@@ -16,6 +16,8 @@
       --walmart-color: #004c97;
       --amazon-bg:     #fef3c7;
       --amazon-color:  #92400e;
+      --publix-bg:     #dcfce7;
+      --publix-color:  #166534;
       --bg:            #f1f5f9;
       --card:          #ffffff;
       --border:        #e2e8f0;
@@ -252,6 +254,7 @@
     .store-badge.aldi    { background: var(--aldi-bg);    color: var(--aldi-color); }
     .store-badge.walmart { background: var(--walmart-bg); color: var(--walmart-color); }
     .store-badge.amazon  { background: var(--amazon-bg);  color: var(--amazon-color); }
+    .store-badge.publix  { background: var(--publix-bg);  color: var(--publix-color); }
 
     /* ── Price comparison ─────────────────────────────────── */
     .comparison-card {
@@ -738,6 +741,9 @@
       <label class="store-toggle">
         <input type="checkbox" id="chkAmazon" checked> Amazon
       </label>
+      <label class="store-toggle">
+        <input type="checkbox" id="chkPublix"> Publix
+      </label>
     </div>
     <div class="header-field" id="walmartStoreField">
       <label for="storeSelect">Walmart Store:</label>
@@ -750,6 +756,12 @@
     <div class="header-field" id="aldiStoreField">
       <label for="aldiStoreSelect">Aldi Store:</label>
       <select id="aldiStoreSelect" style="padding:4px 8px;border-radius:6px;border:none;font-size:.82rem;max-width:220px;">
+        <option value="">Enter zip to load stores</option>
+      </select>
+    </div>
+    <div class="header-field" id="publixStoreField">
+      <label for="publixStoreSelect">Publix Store:</label>
+      <select id="publixStoreSelect" style="padding:4px 8px;border-radius:6px;border:none;font-size:.82rem;max-width:220px;">
         <option value="">Enter zip to load stores</option>
       </select>
     </div>
@@ -911,6 +923,7 @@
     if (document.getElementById('chkAldi').checked)    s.push('aldi');
     if (document.getElementById('chkWalmart').checked) s.push('walmart');
     if (document.getElementById('chkAmazon').checked)  s.push('amazon');
+    if (document.getElementById('chkPublix').checked)  s.push('publix');
     return s;
   }
 
@@ -941,7 +954,7 @@
     clearTimeout(storeLoadTimeout);
     const z = zip();
     if (z.length === 5) {
-      storeLoadTimeout = setTimeout(() => { loadStores(z); loadAldiStores(z); }, 400);
+      storeLoadTimeout = setTimeout(() => { loadStores(z); loadAldiStores(z); loadPublixStores(z); }, 400);
     }
   });
 
@@ -1010,16 +1023,55 @@
     refreshResults();
   });
 
+  async function loadPublixStores(zipCode) {
+    const sel = document.getElementById('publixStoreSelect');
+    sel.innerHTML = '<option value="">Loading stores...</option>';
+    try {
+      const resp = await fetch(`/api/stores?zip=${encodeURIComponent(zipCode)}&store=publix`);
+      const data = await resp.json();
+      if (data.error || !data.stores || !data.stores.length) {
+        sel.innerHTML = '<option value="">No Publix stores found</option>';
+        return;
+      }
+      sel.innerHTML = data.stores.map(s => {
+        const dist = s.distance != null ? ` (${s.distance} mi)` : '';
+        const label = s.name || s.address || `Store ${s.id}`;
+        return `<option value="${esc(s.id)}">${esc(label)}${dist}</option>`;
+      }).join('');
+      const saved = localStorage.getItem('selectedPublixStoreId');
+      if (saved && sel.querySelector(`option[value="${saved}"]`)) {
+        sel.value = saved;
+      }
+      refreshResults();
+    } catch (e) {
+      sel.innerHTML = '<option value="">Error loading stores</option>';
+    }
+  }
+
+  function getPublixStoreId() {
+    return document.getElementById('publixStoreSelect').value || '';
+  }
+
+  document.getElementById('publixStoreSelect').addEventListener('change', () => {
+    const storeId = getPublixStoreId();
+    if (storeId) localStorage.setItem('selectedPublixStoreId', storeId);
+    else localStorage.removeItem('selectedPublixStoreId');
+    refreshResults();
+  });
+
   // Show/hide store dropdowns based on checkbox state
   function updateStoreFieldVisibility() {
     document.getElementById('walmartStoreField').style.display =
       document.getElementById('chkWalmart').checked ? '' : 'none';
     document.getElementById('aldiStoreField').style.display =
       document.getElementById('chkAldi').checked ? '' : 'none';
+    document.getElementById('publixStoreField').style.display =
+      document.getElementById('chkPublix').checked ? '' : 'none';
   }
   document.getElementById('chkAldi').addEventListener('change', updateStoreFieldVisibility);
   document.getElementById('chkWalmart').addEventListener('change', updateStoreFieldVisibility);
   document.getElementById('chkAmazon').addEventListener('change', updateStoreFieldVisibility);
+  document.getElementById('chkPublix').addEventListener('change', updateStoreFieldVisibility);
   updateStoreFieldVisibility();
 
   async function refreshResults() {
@@ -1044,6 +1096,7 @@
           document.getElementById('zipInput').value = data.zip;
           loadStores(data.zip);
           loadAldiStores(data.zip);
+          loadPublixStores(data.zip);
         } else {
           alert('Could not determine zip from location');
         }
@@ -1061,7 +1114,7 @@
   // Load stores on page load
   (() => {
     const z = zip();
-    if (z.length === 5) { loadStores(z); loadAldiStores(z); }
+    if (z.length === 5) { loadStores(z); loadAldiStores(z); loadPublixStores(z); }
   })();
 
   // ── Search ─────────────────────────────────────────────
@@ -1084,14 +1137,16 @@
       let url = `/api/search?q=${encodeURIComponent(query)}&stores=${stores.join(',')}&zip=${zip()}&limit=${resultLimit}${sid ? '&store_id=' + encodeURIComponent(sid) : ''}`;
       if (aldiShopId) url += '&aldi_shop_id=' + encodeURIComponent(aldiShopId);
       if (aldiZoneId) url += '&aldi_zone_id=' + encodeURIComponent(aldiZoneId);
+      const publixStoreId = getPublixStoreId();
+      if (publixStoreId) url += '&publix_store_id=' + encodeURIComponent(publixStoreId);
       const resp = await fetch(url);
       const data = await resp.json();
 
       if (data.error) { renderQueryBlock(query, { error: data.error }); return; }
 
       const products = [];
-      for (const store of ['aldi', 'walmart', 'amazon']) {
-        if (data[store]) products.push(...data[store].map(p => ({ ...p, store, searchQuery: query })));
+      for (const store of ['aldi', 'walmart', 'amazon', 'publix']) {
+        if (data[store]) products.push(...data[store].map(p => ({ ...p, store: p.store || store, searchQuery: query })));
       }
 
       state.results[query] = products;
@@ -1239,7 +1294,11 @@
             ${unitStr ? `<span class="product-row-sub">${esc(unitStr)}</span>` : ''}
             ${!p.in_stock ? '<span class="product-row-oos">Out of stock</span>' : ''}
             ${p.sponsored  ? '<span class="product-row-ad">Ad</span>' : ''}
+            ${p.deal_text  ? `<span class="product-row-sub" style="color:var(--publix-color);font-weight:600">${esc(p.deal_text)}</span>` : ''}
           </div>
+          ${p.coupon_text ? `<div style="font-size:.68rem;color:#7c3aed;margin-top:2px;line-height:1.2">
+            🏷️ ${esc(p.coupon_text)}${p.coupon_price != null ? ` → $${p.coupon_price.toFixed(2)} ea` : ''}
+          </div>` : ''}
         </div>
         <div class="product-row-price">${esc(price)}</div>
         <button class="btn btn-primary btn-sm"
@@ -1397,6 +1456,18 @@
     const searches = state.grocery.filter(g => g.type === 'search');
     for (const item of searches) {
       await doSearch(item.value);
+      await new Promise(r => setTimeout(r, 400));
+    }
+  }
+
+  async function searchRecipeIngredients() {
+    const r = recipeState.editing;
+    if (!r || !r.ingredients || !r.ingredients.length) { alert('No ingredients to search.'); return; }
+    const names = r.ingredients.map(i => i.name).filter(Boolean);
+    if (!names.length) { alert('No ingredient names to search.'); return; }
+    closeRecipeEditor();
+    for (const name of names) {
+      await doSearch(name);
       await new Promise(r => setTimeout(r, 400));
     }
   }
@@ -1891,7 +1962,9 @@
         </div>
         ` : ''}
 
-        <div style="display:flex;justify-content:flex-end;padding:4px 0;">
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:4px 0;">
+          <button class="btn btn-sm btn-primary" style="font-size:.72rem;padding:3px 10px;"
+                  onclick="searchRecipeIngredients()">Search for Ingredients</button>
           <select style="font-size:.72rem;padding:2px 6px;border:1px solid var(--border);border-radius:4px;"
                   onchange="sortRecipeIngredients(this.value)">
             <option value="position" ${(recipeState.ingredientSortMode||'position')==='position'?'selected':''}>Sort: Position</option>
@@ -2157,11 +2230,13 @@
       if (sid) url += '&store_id=' + encodeURIComponent(sid);
       if (aldiShopId) url += '&aldi_shop_id=' + encodeURIComponent(aldiShopId);
       if (aldiZoneId) url += '&aldi_zone_id=' + encodeURIComponent(aldiZoneId);
+      const publixStoreId = getPublixStoreId();
+      if (publixStoreId) url += '&publix_store_id=' + encodeURIComponent(publixStoreId);
 
       const resp = await fetch(url);
       const data = await resp.json();
       const products = [];
-      for (const store of ['aldi', 'walmart', 'amazon']) {
+      for (const store of ['aldi', 'walmart', 'amazon', 'publix']) {
         if (data[store]) products.push(...data[store]);
       }
       recipeState.ingredientSearch[ingId] = { loading: false, results: products, query: name, unitMeta: data.unit_meta || {} };

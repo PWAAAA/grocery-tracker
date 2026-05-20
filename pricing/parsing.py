@@ -17,7 +17,7 @@ _RANGE_RE = re.compile(
     re.IGNORECASE,
 )
 SIZE_RE = re.compile(
-    rf"{_NUM}\s*-?\s*("
+    r"(?<!/)" rf"{_NUM}\s*-?\s*("
     r"fl\.?\s*oz|floz"
     r"|gallons?|gal"
     r"|liters?|litres?|l"
@@ -84,6 +84,28 @@ def parse_pack_size(name: Optional[str]) -> list[tuple[float, str]]:
         except ValueError:
             continue
         out.append((qty, unit))
+    return out
+
+
+def parse_pack_size_with_positions(name: Optional[str]) -> list[tuple[float, str, int]]:
+    """Like parse_pack_size but also returns match position in the string.
+
+    Returns [(qty, unit, position), ...] — position is the start offset
+    of the match in the cleaned string.
+    """
+    if not name:
+        return []
+    cleaned = _RANGE_RE.sub("", name)
+    out: list[tuple[float, str, int]] = []
+    for m in SIZE_RE.finditer(cleaned):
+        unit = _normalize_unit(m.group(2))
+        if unit is None:
+            continue
+        try:
+            qty = float(m.group(1))
+        except ValueError:
+            continue
+        out.append((qty, unit, m.start()))
     return out
 
 
