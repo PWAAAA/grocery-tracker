@@ -21,7 +21,7 @@ WEIGHT_TO_OZ: dict[str, float] = {
 }
 
 # Count units (canonical: each)
-COUNT_UNITS: set[str] = {"count", "pack", "dozen"}
+COUNT_UNITS: set[str] = {"count", "pack", "dozen", "sheet"}
 DOZEN_MULTIPLIER = {"dozen": 12}
 
 # Reverse lookup: normalized unit -> dimension
@@ -45,7 +45,7 @@ QUERY_KEYWORDS: dict[str, list[str]] = {
     "count": [
         "egg", "cookie", "bagel", "muffin", "donut", "doughnut", "tortilla",
         "burrito", "popsicle", "k-cup", "k cup", "pod", "tampon", "diaper",
-        "paper towel", "toilet paper", "napkin", "trash bag", "battery",
+        "paper towel", "toilet paper", "tissue", "napkin", "trash bag", "battery",
         "lightbulb", "bulb", "candy bar", "ice cream bar",
     ],
     "weight": [
@@ -65,8 +65,14 @@ QUERY_KEYWORDS: dict[str, list[str]] = {
 DIMENSION_DEFAULT: dict[str, str] = {
     "volume": "per_fl_oz",
     "weight": "per_lb",
-    "count": "per_ea",
+    "count": "per_100_ct",
 }
 UNIT_OPTION_ORDER: list[str] = [
-    "per_ea", "per_dozen", "per_fl_oz", "per_gal", "per_oz", "per_lb",
+    "per_ea", "per_dozen", "per_100_ct", "per_fl_oz", "per_gal", "per_oz", "per_lb",
 ]
+
+DIMENSION_FILTER: dict[str, set[str]] = {
+    "volume": {"per_ea", "per_fl_oz", "per_gal"},
+    "weight": {"per_ea", "per_oz", "per_lb"},
+    "count":  {"per_ea", "per_dozen", "per_100_ct"},
+}

@@ -67,6 +67,56 @@ def extract_next_data(html: str) -> Optional[dict]:
         return None
 
 
+def _extract_serving_size(product: dict) -> Optional[str]:
+    """Extract serving size string from Walmart product nutrition data.
+
+    Searches several known JSON paths where Walmart stores nutrition/serving info:
+    - product.nutritionFacts.servingSize
+    - product.idmlSections (IDML content blocks with nutrition details)
+    - product.detailedIngredients or product.specificationHighlights
+    """
+    # Path 1: Direct nutritionFacts field
+    nf = product.get("nutritionFacts")
+    if isinstance(nf, dict):
+        ss = nf.get("servingSize") or nf.get("servingSizeString")
+        if ss:
+            return str(ss)
+
+    # Path 2: IDML sections — Walmart often nests nutrition in these content blocks
+    idml = product.get("idmlSections")
+    if isinstance(idml, dict):
+        for section_key, section_val in idml.items():
+            if not isinstance(section_val, dict):
+                continue
+            # Check for servingSize inside section
+            ss = section_val.get("servingSize")
+            if ss:
+                return str(ss)
+            # Sometimes it's in a nested "specifications" or "nutritionFacts" sub-object
+            for sub_key in ("nutritionFacts", "specifications"):
+                sub = section_val.get(sub_key)
+                if isinstance(sub, dict):
+                    ss = sub.get("servingSize") or sub.get("servingSizeString")
+                    if ss:
+                        return str(ss)
+
+    # Path 3: Nutrition info in product.nutritionInformation or similar
+    ni = product.get("nutritionInformation")
+    if isinstance(ni, dict):
+        ss = ni.get("servingSize") or ni.get("servingSizeString")
+        if ss:
+            return str(ss)
+
+    # Path 4: Detailed description fields may contain serving size text
+    # (less reliable, but worth checking as fallback)
+    for key in ("servingSize", "servingSizeString"):
+        val = product.get(key)
+        if val:
+            return str(val)
+
+    return None
+
+
 def parse_product_page(data: dict, product_id: str) -> WalmartProduct:
     """
     Extract price and product info from a single product page's
@@ -108,6 +158,9 @@ def parse_product_page(data: dict, product_id: str) -> WalmartProduct:
         image_info = product.get("imageInfo", {})
         thumbnail = image_info.get("thumbnailUrl", None)
 
+        # --- Serving size (from nutrition facts) ---
+        serving_size = _extract_serving_size(product)
+
         # --- Store ---
         store_node = (
             data.get("props", {})
@@ -132,6 +185,7 @@ def parse_product_page(data: dict, product_id: str) -> WalmartProduct:
             url=url,
             brand=brand,
             image_url=thumbnail,
+            serving_size=serving_size,
         )
 
     except (KeyError, TypeError) as e:
@@ -168,6 +222,9 @@ def parse_search_results(data: dict) -> list[dict]:
     """
     results = []
     seen_ids = set()
+    skipped_non_product = 0
+    skipped_dupes = 0
+    total_items = 0
     try:
         stacks = data["props"]["pageProps"]["initialData"]["searchResult"]["itemStacks"]
     except (KeyError, TypeError) as e:
@@ -178,13 +235,17 @@ def parse_search_results(data: dict) -> list[dict]:
         if not isinstance(stack, dict):
             continue
         for item in stack.get("items", []):
+            total_items += 1
             try:
                 if not isinstance(item, dict):
+                    skipped_non_product += 1
                     continue
                 if item.get("__typename") != "Product":
+                    skipped_non_product += 1
                     continue
                 pid = item.get("usItemId", "")
                 if pid in seen_ids:
+                    skipped_dupes += 1
                     continue
                 seen_ids.add(pid)
                 price_info = item.get("priceInfo")
@@ -200,6 +261,7 @@ def parse_search_results(data: dict) -> list[dict]:
                 badge_groups = item.get("fulfillmentBadgeGroups") or []
                 badge_keys = {bg.get("key") for bg in badge_groups if isinstance(bg, dict)}
                 in_store = "FF_PICKUP" in badge_keys
+                log.debug(f"  [{pid}] badges: {badge_keys}, fulfillmentType: {item.get('fulfillmentType')}")
 
                 results.append({
                     "name": item.get("name"),
@@ -215,4 +277,8 @@ def parse_search_results(data: dict) -> list[dict]:
             except Exception as e:
                 log.warning(f"Skipping malformed search item: {e}")
 
+    in_store_count = sum(1 for r in results if r.get("in_store"))
+    log.info(f"Parsed {len(results)} products from {total_items} items "
+             f"({skipped_non_product} non-product, {skipped_dupes} dupes)")
+    log.info(f"  In-store: {in_store_count}, Shipping-only: {len(results) - in_store_count}")
     return results

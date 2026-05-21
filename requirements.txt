@@ -1,0 +1,4 @@
+flask
+requests
+curl_cffi
+libsql-experimental

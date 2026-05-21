@@ -28,6 +28,7 @@ class WalmartProduct:
     url: str
     brand: Optional[str] = None
     image_url: Optional[str] = None
+    serving_size: Optional[str] = None
     error: Optional[str] = None
 
 
@@ -47,5 +48,25 @@ class AldiProduct:
     store_location: Optional[str]
     url: str
     image_url: Optional[str] = None
+    serving_size: Optional[str] = None
+    currency: str = "USD"
+    error: Optional[str] = None
+
+
+@dataclass
+class AmazonProduct:
+    """Result from scraping an Amazon product page (Prime or Fresh)."""
+    name: str
+    product_id: str
+    price: Optional[float]
+    price_string: Optional[str]
+    unit_price_string: Optional[str]
+    size: Optional[str]
+    brand: Optional[str]
+    in_stock: bool
+    on_sale: bool
+    url: str
+    image_url: Optional[str] = None
+    serving_size: Optional[str] = None
     currency: str = "USD"
     error: Optional[str] = None
