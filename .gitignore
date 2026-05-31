@@ -1,19 +1,22 @@
-*
+# Python byte-code & caches
 __pycache__/
+*.py[cod]
+.ruff_cache/
 
-!.gitignore
-!app.py
-!index.html
-!scrapers/
-!scrapers/**
-!pricing/
-!pricing/**
-!database.py
-!README.md
-!LICENSE
-!requirements.txt
-!ruff.toml
-!.github/
-!.github/**
-!price_history.py
-!seed_price_history.py
+# Local SQLite database (generated at runtime; not shipped)
+grocery.db
+
+# Legacy / unused single-file scripts & browser profiles
+old/
+
+# Debug dumps & scratch output
+_debug_*.html
+aldi_prices.json
+
+# Personal notes (not part of the project)
+python SWEng use.txt
+
+# Project instructions & local tooling config (kept local, not shipped)
+CLAUDE.md
+.vscode/
+.claude/settings.local.json
