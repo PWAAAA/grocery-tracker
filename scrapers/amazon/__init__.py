@@ -16,6 +16,10 @@ from .stores import find_stores_by_zip
 from .config import DEFAULT_ZIP
 
 __all__ = [
-    "scrape_search", "scrape_product", "scrape_product_list",
-    "extract_id_from_url", "find_stores_by_zip", "DEFAULT_ZIP",
+    "scrape_search",
+    "scrape_product",
+    "scrape_product_list",
+    "extract_id_from_url",
+    "find_stores_by_zip",
+    "DEFAULT_ZIP",
 ]

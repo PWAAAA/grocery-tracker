@@ -47,19 +47,37 @@ from scrapers.publix import (
 )
 from pricing import standardize_results as standardize_unit_prices
 from database import (
-    init_db, get_grocery_items, set_grocery_items, classify_item,
-    get_recipes, get_recipe, create_recipe, update_recipe, delete_recipe,
-    add_ingredient, update_ingredient, delete_ingredient,
-    add_ingredient_product, delete_ingredient_product, get_ingredient_products,
+    init_db,
+    get_grocery_items,
+    set_grocery_items,
+    classify_item,
+    get_recipes,
+    get_recipe,
+    create_recipe,
+    update_recipe,
+    delete_recipe,
+    add_ingredient,
+    update_ingredient,
+    delete_ingredient,
+    add_ingredient_product,
+    delete_ingredient_product,
+    get_ingredient_products,
     update_ingredient_product,
-    get_all_publix_base_prices, get_publix_base_price,
+    get_all_publix_base_prices,
+    get_publix_base_price,
     get_publix_unknown_prices,
 )
-from pricing.cooking import compute_ingredient_cost, format_ingredient_cost_breakdown, COOKING_UNITS
+from pricing.cooking import (
+    compute_ingredient_cost,
+    format_ingredient_cost_breakdown,
+    COOKING_UNITS,
+)
 from pricing.serving_size import parse_serving_size_density
 import price_history
 
-logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s"
+)
 log = logging.getLogger(__name__)
 
 app = Flask(__name__, static_folder=".", static_url_path="")
@@ -104,6 +122,7 @@ def api_reverse_geocode():
         return jsonify({"error": "lat and lon required"}), 400
     try:
         import requests as _req
+
         resp = _req.get(
             f"https://nominatim.openstreetmap.org/reverse?lat={lat}&lon={lon}&format=json",
             headers={"User-Agent": "GroceryPriceComparer/1.0"},
@@ -141,7 +160,9 @@ def api_stores():
 @app.route("/api/search")
 def api_search():
     q = request.args.get("q", "").strip()
-    stores = [s.strip() for s in request.args.get("stores", "aldi").split(",") if s.strip()]
+    stores = [
+        s.strip() for s in request.args.get("stores", "aldi").split(",") if s.strip()
+    ]
     zip_code = request.args.get("zip", DEFAULT_ZIP).strip() or DEFAULT_ZIP
     limit = min(max(int(request.args.get("limit", 12)), 1), 96)
 
@@ -174,12 +195,16 @@ def api_search():
     if "walmart" in stores:
         try:
             store_id = request.args.get("store_id", "").strip() or None
-            raw = walmart_search(query=q, zip_code=zip_code, store_id=store_id, limit=limit)
+            raw = walmart_search(
+                query=q, zip_code=zip_code, store_id=store_id, limit=limit
+            )
             # Filter out shipping-only products (no in-store pickup)
             pre_filter = len(raw)
             raw = [p for p in raw if p.get("in_store", True)]
             if pre_filter != len(raw):
-                log.info(f"Walmart '{q}': filtered {pre_filter - len(raw)}/{pre_filter} shipping-only items")
+                log.info(
+                    f"Walmart '{q}': filtered {pre_filter - len(raw)}/{pre_filter} shipping-only items"
+                )
             # Sponsored items go last; cap after sorting
             raw.sort(key=lambda p: bool(p.get("sponsored")))
             raw = raw[:limit]
@@ -188,7 +213,9 @@ def api_search():
                     "name": p.get("name"),
                     "product_id": p.get("product_id"),
                     "price": p.get("price"),
-                    "price_string": f"${p['price']:.2f}" if p.get("price") is not None else None,
+                    "price_string": f"${p['price']:.2f}"
+                    if p.get("price") is not None
+                    else None,
                     "unit_price_string": p.get("unit_price_string"),
                     "image_url": p.get("image"),
                     "url": p.get("url"),
@@ -210,13 +237,17 @@ def api_search():
     if "amazon" in stores:
         try:
             fresh_only = request.args.get("amazon_fresh", "").strip().lower() == "true"
-            raw = amazon_search(query=q, zip_code=zip_code, limit=limit, fresh_only=fresh_only)
+            raw = amazon_search(
+                query=q, zip_code=zip_code, limit=limit, fresh_only=fresh_only
+            )
             # Filter to Prime-eligible only (unless searching Fresh specifically)
             if not fresh_only:
                 pre_filter = len(raw)
                 raw = [p for p in raw if p.get("is_prime", False)]
                 if pre_filter != len(raw):
-                    log.info(f"Amazon '{q}': filtered {pre_filter - len(raw)}/{pre_filter} non-Prime items")
+                    log.info(
+                        f"Amazon '{q}': filtered {pre_filter - len(raw)}/{pre_filter} non-Prime items"
+                    )
             # Sponsored items go last; cap after sorting
             raw.sort(key=lambda p: bool(p.get("sponsored")))
             raw = raw[:limit]
@@ -225,7 +256,8 @@ def api_search():
                     "name": p.get("name"),
                     "product_id": p.get("product_id"),
                     "price": p.get("price"),
-                    "price_string": p.get("price_string") or (f"${p['price']:.2f}" if p.get("price") is not None else None),
+                    "price_string": p.get("price_string")
+                    or (f"${p['price']:.2f}" if p.get("price") is not None else None),
                     "unit_price_string": p.get("unit_price_string"),
                     "image_url": p.get("image"),
                     "url": p.get("url"),
@@ -250,8 +282,13 @@ def api_search():
         try:
             publix_store_id = request.args.get("publix_store_id", "").strip() or None
             session = get_publix_session()
-            raw = publix_search(query=q, zip_code=zip_code, store_id=publix_store_id,
-                                session=session, limit=limit)
+            raw = publix_search(
+                query=q,
+                zip_code=zip_code,
+                store_id=publix_store_id,
+                session=session,
+                limit=limit,
+            )
             results["publix"] = [
                 {
                     "name": p.get("name"),
@@ -288,8 +325,12 @@ def api_search():
     # Standardize unit prices across all stores in one pass so a single
     # toggle covers the whole query block. Mutates each product to add
     # `std_units`; one `unit_meta` covers everything.
-    all_products = (list(results.get("aldi") or []) + list(results.get("walmart") or [])
-                    + list(results.get("amazon") or []) + list(results.get("publix") or []))
+    all_products = (
+        list(results.get("aldi") or [])
+        + list(results.get("walmart") or [])
+        + list(results.get("amazon") or [])
+        + list(results.get("publix") or [])
+    )
     meta = standardize_unit_prices(q, all_products)
     default_key = meta["unit_default"]
     if default_key:
@@ -304,7 +345,10 @@ def api_search():
     try:
         store_id = request.args.get("store_id", "").strip() or None
         price_history.record_observations(
-            all_products, query=q, zip_code=zip_code, store_id=store_id,
+            all_products,
+            query=q,
+            zip_code=zip_code,
+            store_id=store_id,
             default_unit_key=default_key,
         )
         badges = price_history.get_badges_for_keys(
@@ -335,7 +379,9 @@ def api_grocery_list_post():
     if data is None:
         return jsonify({"error": "JSON body required"}), 400
     raw_items = data.get("items", [])
-    classified = [classify_item(item) if isinstance(item, str) else item for item in raw_items]
+    classified = [
+        classify_item(item) if isinstance(item, str) else item for item in raw_items
+    ]
     set_grocery_items(classified)
     return jsonify({"items": get_grocery_items()})
 
@@ -369,21 +415,23 @@ def api_fetch_links():
             if product.error:
                 log.warning(f"Walmart product {pid}: {product.error}")
                 continue
-            results.append({
-                "name": product.name,
-                "product_id": product.product_id,
-                "price": product.price,
-                "price_string": product.price_string,
-                "unit_price_string": product.unit_price_string,
-                "image_url": product.image_url,
-                "url": product.url,
-                "store": "walmart",
-                "in_stock": product.in_stock,
-                "brand": product.brand,
-                "size": None,
-                "serving_size": product.serving_size,
-                "sponsored": False,
-            })
+            results.append(
+                {
+                    "name": product.name,
+                    "product_id": product.product_id,
+                    "price": product.price,
+                    "price_string": product.price_string,
+                    "unit_price_string": product.unit_price_string,
+                    "image_url": product.image_url,
+                    "url": product.url,
+                    "store": "walmart",
+                    "in_stock": product.in_stock,
+                    "brand": product.brand,
+                    "size": None,
+                    "serving_size": product.serving_size,
+                    "sponsored": False,
+                }
+            )
         except Exception as e:
             log.error(f"Error fetching Walmart product {pid}: {e}")
 
@@ -399,14 +447,18 @@ def api_fetch_links():
     if aldi_ids:
         try:
             session = get_aldi_session()
-            products = aldi_scrape_products(aldi_ids, postal_code=zip_code, session=session)
+            products = aldi_scrape_products(
+                aldi_ids, postal_code=zip_code, session=session
+            )
             for p in products:
                 if p.error:
                     continue
-                results.append({
-                    **asdict(p),
-                    "store": "aldi",
-                })
+                results.append(
+                    {
+                        **asdict(p),
+                        "store": "aldi",
+                    }
+                )
         except Exception as e:
             log.error(f"Error fetching Aldi products: {e}")
 
@@ -421,10 +473,12 @@ def api_fetch_links():
             if product.error:
                 log.warning(f"Amazon product {pid}: {product.error}")
                 continue
-            results.append({
-                **asdict(product),
-                "store": "amazon",
-            })
+            results.append(
+                {
+                    **asdict(product),
+                    "store": "amazon",
+                }
+            )
         except Exception as e:
             log.error(f"Error fetching Amazon product {pid}: {e}")
 
@@ -453,7 +507,9 @@ def api_fetch_links():
 
     try:
         price_history.record_observations(
-            results, zip_code=zip_code, store_id=store_id,
+            results,
+            zip_code=zip_code,
+            store_id=store_id,
             default_unit_key=default_key,
         )
     except Exception as e:
@@ -463,6 +519,7 @@ def api_fetch_links():
 
 
 # ── Recipe endpoints ───────────────────────────────────────────────
+
 
 @app.route("/api/recipes", methods=["GET"])
 def api_recipes_list():
@@ -545,7 +602,9 @@ def api_ingredient_update(ingredient_id):
             if not ing["quantity"] or not ing["unit"]:
                 updated_products.append(ip)
                 continue
-            std_units = json.loads(ip["std_units_json"]) if ip.get("std_units_json") else {}
+            std_units = (
+                json.loads(ip["std_units_json"]) if ip.get("std_units_json") else {}
+            )
             # Rebuild minimal product dict for cost computation
             product_dict = {
                 "name": ip.get("product_name"),
@@ -569,7 +628,9 @@ def api_ingredient_update(ingredient_id):
                 ingredient_name=ing["name"],
                 density_override=density,
             )
-            update_ingredient_product(ip["id"], ingredient_cost=cost, cost_breakdown=breakdown)
+            update_ingredient_product(
+                ip["id"], ingredient_cost=cost, cost_breakdown=breakdown
+            )
             ip["ingredient_cost"] = cost
             ip["cost_breakdown"] = breakdown
             updated_products.append(ip)
@@ -578,8 +639,11 @@ def api_ingredient_update(ingredient_id):
         costed = [p for p in updated_products if p.get("ingredient_cost") is not None]
         if costed:
             cheapest = min(costed, key=lambda p: p["ingredient_cost"])
-            update_ingredient(ingredient_id, ingredient_cost=cheapest["ingredient_cost"],
-                              cost_breakdown=cheapest["cost_breakdown"])
+            update_ingredient(
+                ingredient_id,
+                ingredient_cost=cheapest["ingredient_cost"],
+                cost_breakdown=cheapest["cost_breakdown"],
+            )
             ing["ingredient_cost"] = cheapest["ingredient_cost"]
             ing["cost_breakdown"] = cheapest["cost_breakdown"]
 
@@ -720,9 +784,12 @@ def api_recipe_recalculate(recipe_id):
                         p = walmart_scrape_product(pid, zip_code)
                         if not p.error:
                             product_dict = {
-                                "name": p.name, "price": p.price,
+                                "name": p.name,
+                                "price": p.price,
                                 "unit_price_string": p.unit_price_string,
-                                "store": "walmart", "size": None, "url": p.url,
+                                "store": "walmart",
+                                "size": None,
+                                "url": p.url,
                                 "serving_size": p.serving_size,
                             }
                     except Exception as e:
@@ -732,11 +799,14 @@ def api_recipe_recalculate(recipe_id):
                 if pid:
                     try:
                         session = get_aldi_session()
-                        products = aldi_scrape_products([pid], postal_code=zip_code, session=session)
+                        products = aldi_scrape_products(
+                            [pid], postal_code=zip_code, session=session
+                        )
                         if products and not products[0].error:
                             p = products[0]
                             product_dict = {
-                                **asdict(p), "store": "aldi",
+                                **asdict(p),
+                                "store": "aldi",
                             }
                     except Exception as e:
                         log.error(f"Recipe recalc - Aldi fetch error for {pid}: {e}")
@@ -747,9 +817,12 @@ def api_recipe_recalculate(recipe_id):
                         p = amazon_scrape_product(pid, zip_code)
                         if not p.error:
                             product_dict = {
-                                "name": p.name, "price": p.price,
+                                "name": p.name,
+                                "price": p.price,
                                 "unit_price_string": p.unit_price_string,
-                                "store": "amazon", "size": p.size, "url": p.url,
+                                "store": "amazon",
+                                "size": p.size,
+                                "url": p.url,
                                 "serving_size": p.serving_size,
                             }
                     except Exception as e:
@@ -762,9 +835,11 @@ def api_recipe_recalculate(recipe_id):
                         p = publix_scrape_product(pid, zip_code, session=session)
                         if p:
                             product_dict = {
-                                "name": p.get("name"), "price": p.get("price"),
+                                "name": p.get("name"),
+                                "price": p.get("price"),
                                 "unit_price_string": p.get("unit_price_string"),
-                                "store": "publix", "size": p.get("size"),
+                                "store": "publix",
+                                "size": p.get("size"),
                                 "url": p.get("url"),
                                 "serving_size": p.get("serving_size"),
                             }
@@ -797,12 +872,19 @@ def api_recipe_recalculate(recipe_id):
                 )
 
                 # Update the ingredient_product row
-                conn = __import__('database').get_connection()
+                conn = __import__("database").get_connection()
                 conn.execute(
                     "UPDATE ingredient_products SET product_name=?, product_price=?, "
                     "product_unit_price=?, ingredient_cost=?, cost_breakdown=?, density_oz_per_cup=? WHERE id=?",
-                    (product_dict.get("name"), product_dict.get("price"),
-                     product_dict.get("unit_price_string"), cost, breakdown, density, ip["id"]),
+                    (
+                        product_dict.get("name"),
+                        product_dict.get("price"),
+                        product_dict.get("unit_price_string"),
+                        cost,
+                        breakdown,
+                        density,
+                        ip["id"],
+                    ),
                 )
                 conn.commit()
                 conn.close()
@@ -847,7 +929,9 @@ def api_cheapest():
 def api_weekly_ad():
     zip_code = request.args.get("zip", DEFAULT_ZIP).strip()
     store_id = request.args.get("publix_store_id", "").strip() or None
-    products = publix_weekly_ad(zip_code=zip_code, store_id=store_id, session=get_publix_session())
+    products = publix_weekly_ad(
+        zip_code=zip_code, store_id=store_id, session=get_publix_session()
+    )
     meta = standardize_unit_prices("weekly ad", products)
     return jsonify({"products": products, "count": len(products), "unit_meta": meta})
 

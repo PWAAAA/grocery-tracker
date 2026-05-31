@@ -32,26 +32,11 @@ def find_stores_by_zip(zip_code: str, limit: int = 10) -> list[dict]:
     stores = []
 
     # Prime delivery is generally available everywhere
-    stores.append({
-        "id": "amazon-prime",
-        "displayName": "Amazon Prime Delivery",
-        "name": "Amazon.com (Prime)",
-        "distance": None,
-        "address": {
-            "street": "",
-            "city": "",
-            "state": "",
-            "zip": zip_code,
-        },
-    })
-
-    # Check if Amazon Fresh is available in this zip
-    fresh_available = _check_fresh_availability(zip_code)
-    if fresh_available:
-        stores.append({
-            "id": "amazon-fresh",
-            "displayName": "Amazon Fresh Delivery",
-            "name": "Amazon Fresh",
+    stores.append(
+        {
+            "id": "amazon-prime",
+            "displayName": "Amazon Prime Delivery",
+            "name": "Amazon.com (Prime)",
             "distance": None,
             "address": {
                 "street": "",
@@ -59,7 +44,26 @@ def find_stores_by_zip(zip_code: str, limit: int = 10) -> list[dict]:
                 "state": "",
                 "zip": zip_code,
             },
-        })
+        }
+    )
+
+    # Check if Amazon Fresh is available in this zip
+    fresh_available = _check_fresh_availability(zip_code)
+    if fresh_available:
+        stores.append(
+            {
+                "id": "amazon-fresh",
+                "displayName": "Amazon Fresh Delivery",
+                "name": "Amazon Fresh",
+                "distance": None,
+                "address": {
+                    "street": "",
+                    "city": "",
+                    "state": "",
+                    "zip": zip_code,
+                },
+            }
+        )
 
     log.info(f"Amazon: {len(stores)} delivery options for zip {zip_code}")
     return stores[:limit]
@@ -80,11 +84,18 @@ def _check_fresh_availability(zip_code: str) -> bool:
         url = "https://www.amazon.com/alm/storefront?almBrandId=QW1hem9uIEZyZXNo"
 
         if HAS_CFFI:
-            resp = _requests.get(url, cookies=cookies, impersonate="chrome", timeout=10, verify=False)
+            resp = _requests.get(
+                url, cookies=cookies, impersonate="chrome", timeout=10, verify=False
+            )
         else:
             resp = _requests.get(
-                url, cookies=cookies, timeout=10, verify=False,
-                headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
+                url,
+                cookies=cookies,
+                timeout=10,
+                verify=False,
+                headers={
+                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+                },
             )
 
         if resp.status_code != 200:

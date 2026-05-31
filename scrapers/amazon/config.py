@@ -31,5 +31,5 @@ DEFAULT_ZIP = "32801"
 BASE_URL = "https://www.amazon.com"
 
 # Search department filters
-DEPT_GROCERY = "amazonfresh"       # Amazon Fresh / Grocery
-DEPT_ALL = ""                       # All departments (filter Prime in results)
+DEPT_GROCERY = "amazonfresh"  # Amazon Fresh / Grocery
+DEPT_ALL = ""  # All departments (filter Prime in results)

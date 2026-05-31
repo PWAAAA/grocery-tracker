@@ -17,7 +17,9 @@ from pathlib import Path
 from .config import DEFAULT_SHOP_ID, DEFAULT_ZONE_ID, DEFAULT_ZIP, DEFAULT_SEARCH_LIMIT
 from .api import find_products, scrape_products, extract_id_from_url
 
-logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s"
+)
 
 
 def main():
@@ -54,11 +56,33 @@ How to find your store ID and zone ID:
     parser.add_argument("--ids", nargs="+", type=str, help="Aldi product IDs to scrape")
     parser.add_argument("--url", type=str, help="Extract product ID from an Aldi URL")
     parser.add_argument("--find", type=str, help="Search Aldi for products by keyword")
-    parser.add_argument("--limit", type=int, default=DEFAULT_SEARCH_LIMIT, help=f"Max search results (default: {DEFAULT_SEARCH_LIMIT})")
-    parser.add_argument("--zip", type=str, default=DEFAULT_ZIP, help=f"Zip code (default: {DEFAULT_ZIP})")
-    parser.add_argument("--store", type=str, default=DEFAULT_SHOP_ID, help=f"Store/shop ID (default: {DEFAULT_SHOP_ID})")
-    parser.add_argument("--zone", type=str, default=DEFAULT_ZONE_ID, help=f"Zone ID (default: {DEFAULT_ZONE_ID})")
-    parser.add_argument("--output", type=str, default="aldi_prices.json", help="Output JSON file")
+    parser.add_argument(
+        "--limit",
+        type=int,
+        default=DEFAULT_SEARCH_LIMIT,
+        help=f"Max search results (default: {DEFAULT_SEARCH_LIMIT})",
+    )
+    parser.add_argument(
+        "--zip",
+        type=str,
+        default=DEFAULT_ZIP,
+        help=f"Zip code (default: {DEFAULT_ZIP})",
+    )
+    parser.add_argument(
+        "--store",
+        type=str,
+        default=DEFAULT_SHOP_ID,
+        help=f"Store/shop ID (default: {DEFAULT_SHOP_ID})",
+    )
+    parser.add_argument(
+        "--zone",
+        type=str,
+        default=DEFAULT_ZONE_ID,
+        help=f"Zone ID (default: {DEFAULT_ZONE_ID})",
+    )
+    parser.add_argument(
+        "--output", type=str, default="aldi_prices.json", help="Output JSON file"
+    )
     args = parser.parse_args()
 
     print("\n" + "=" * 60)
@@ -89,8 +113,8 @@ How to find your store ID and zone ID:
     # ---- Mode: Scrape product IDs ----
     else:
         product_ids = args.ids or [
-            "16902710",   # Friendly Farms Vitamin D Milk, 1 gal
-            "20986614",   # Friendly Farms 2% Milk, 0.5 gal
+            "16902710",  # Friendly Farms Vitamin D Milk, 1 gal
+            "20986614",  # Friendly Farms 2% Milk, 0.5 gal
         ]
 
         results = scrape_products(
@@ -101,7 +125,7 @@ How to find your store ID and zone ID:
         )
 
     print(f"  {'Price':>8} | {'Size':>10} | {'Product':<40} | {'Location'}")
-    print(f"  {'-'*8} | {'-'*10} | {'-'*40} | {'-'*15}")
+    print(f"  {'-' * 8} | {'-' * 10} | {'-' * 40} | {'-' * 15}")
 
     for r in results:
         if r.error:

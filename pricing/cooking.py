@@ -26,8 +26,8 @@ COOKING_TO_FLOZ: dict[str, float] = {
 
 # ── Special cooking units → weight in oz ───────────────────────────
 COOKING_SPECIAL_TO_OZ: dict[str, float] = {
-    "stick": 4.0,       # 1 stick butter = 4 oz = 1/2 cup
-    "clove": 0.18,      # 1 clove garlic ~ 3g ~ 0.1 oz
+    "stick": 4.0,  # 1 stick butter = 4 oz = 1/2 cup
+    "clove": 0.18,  # 1 clove garlic ~ 3g ~ 0.1 oz
 }
 
 # ── Ingredient density: oz (weight) per cup ────────────────────────
@@ -46,7 +46,6 @@ DENSITY_OZ_PER_CUP: dict[str, float] = {
     "coconut flour": 4.5,
     "cornmeal": 5.5,
     "cornstarch": 4.5,
-
     # Sugars
     "sugar": 7.05,
     "granulated sugar": 7.05,
@@ -54,7 +53,6 @@ DENSITY_OZ_PER_CUP: dict[str, float] = {
     "brown sugar": 7.75,
     "powdered sugar": 4.0,
     "confectioners sugar": 4.0,
-
     # Grains & pasta
     "rice": 7.05,
     "white rice": 7.05,
@@ -64,14 +62,13 @@ DENSITY_OZ_PER_CUP: dict[str, float] = {
     "pasta": 4.0,
     "macaroni": 4.0,
     "penne": 4.0,
-    "spaghetti": 4.0,     # loosely packed dry
+    "spaghetti": 4.0,  # loosely packed dry
     "oats": 3.0,
     "rolled oats": 3.0,
     "quinoa": 6.0,
     "couscous": 6.0,
     "breadcrumbs": 4.0,
     "panko": 2.0,
-
     # Dairy & fats
     "butter": 8.0,
     "cream cheese": 8.0,
@@ -80,7 +77,6 @@ DENSITY_OZ_PER_CUP: dict[str, float] = {
     "cheese": 4.0,
     "parmesan": 3.0,
     "grated parmesan": 3.0,
-
     # Nuts & seeds
     "nuts": 4.5,
     "peanuts": 5.0,
@@ -90,13 +86,11 @@ DENSITY_OZ_PER_CUP: dict[str, float] = {
     "cashews": 5.0,
     "sunflower seeds": 5.0,
     "sesame seeds": 5.0,
-
     # Spreads & thick liquids (priced by weight)
     "peanut butter": 9.0,
     "cocoa powder": 3.0,
     "cocoa": 3.0,
     "chocolate chips": 6.0,
-
     # Beans & legumes (dry)
     "beans": 6.5,
     "black beans": 6.5,
@@ -104,7 +98,6 @@ DENSITY_OZ_PER_CUP: dict[str, float] = {
     "kidney beans": 6.5,
     "chickpeas": 6.5,
     "lentils": 7.0,
-
     # Liquid condiments (weight oz per cup — these are liquids priced by "oz" which is really fl oz)
     "soy sauce": 8.5,
     "vinegar": 8.4,
@@ -119,10 +112,9 @@ DENSITY_OZ_PER_CUP: dict[str, float] = {
     "fish sauce": 8.8,
     "teriyaki sauce": 8.5,
     "oyster sauce": 9.0,
-
     # Misc
     "salt": 10.0,
-    "coconut": 3.0,       # shredded
+    "coconut": 3.0,  # shredded
     "shredded coconut": 3.0,
     "raisins": 5.5,
     "dried cranberries": 5.0,
@@ -359,10 +351,24 @@ def format_ingredient_cost_breakdown(
 
 # All recognized cooking units for the frontend dropdown
 COOKING_UNITS = [
-    "cup", "tbsp", "tsp",
-    "oz", "lb", "g", "kg",
-    "fl oz", "gallon", "quart", "pint", "liter", "ml",
-    "each", "dozen",
-    "stick", "clove",
-    "whole", "piece", "slice",
+    "cup",
+    "tbsp",
+    "tsp",
+    "oz",
+    "lb",
+    "g",
+    "kg",
+    "fl oz",
+    "gallon",
+    "quart",
+    "pint",
+    "liter",
+    "ml",
+    "each",
+    "dozen",
+    "stick",
+    "clove",
+    "whole",
+    "piece",
+    "slice",
 ]

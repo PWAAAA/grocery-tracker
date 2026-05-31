@@ -20,8 +20,13 @@ from urllib.parse import quote_plus
 
 from scrapers.models import AmazonProduct
 from .config import (
-    MAX_RETRIES, MIN_DELAY, MAX_DELAY, MAX_SEARCH_PAGES,
-    DEFAULT_ZIP, BASE_URL, DEPT_GROCERY,
+    MAX_RETRIES,
+    MIN_DELAY,
+    MAX_DELAY,
+    MAX_SEARCH_PAGES,
+    DEFAULT_ZIP,
+    BASE_URL,
+    DEPT_GROCERY,
 )
 from .http import fetch_page
 from .parser import parse_product_page, parse_search_results
@@ -84,7 +89,9 @@ def scrape_search(
         limit:       Maximum number of results to return.
         fresh_only:  If True, search only Amazon Fresh/Grocery department.
     """
-    log.info(f"Searching Amazon for '{query}' (zip: {zip_code}, limit: {limit}, fresh: {fresh_only})")
+    log.info(
+        f"Searching Amazon for '{query}' (zip: {zip_code}, limit: {limit}, fresh: {fresh_only})"
+    )
 
     referer = f"https://www.google.com/search?q={quote_plus(query + ' amazon')}"
 
@@ -102,7 +109,8 @@ def scrape_search(
         log.info(f"Amazon search '{query}': fetching page {page_num}")
 
         html = fetch_page(
-            url, zip_code,
+            url,
+            zip_code,
             referer=referer,
             max_retries=max_retries,
         )
@@ -112,7 +120,9 @@ def scrape_search(
 
         page_results = parse_search_results(html)
         if not page_results:
-            log.info(f"Amazon search '{query}': page {page_num} returned 0 results, stopping")
+            log.info(
+                f"Amazon search '{query}': page {page_num} returned 0 results, stopping"
+            )
             break
 
         # Deduplicate across pages
@@ -124,7 +134,9 @@ def scrape_search(
                 all_results.append(product)
                 new_count += 1
 
-        log.info(f"Amazon search '{query}': page {page_num} added {new_count} new results (total: {len(all_results)})")
+        log.info(
+            f"Amazon search '{query}': page {page_num} added {new_count} new results (total: {len(all_results)})"
+        )
 
         if len(all_results) >= limit:
             break
@@ -167,17 +179,17 @@ def extract_id_from_url(url: str) -> Optional[str]:
         https://amazon.com/dp/B00MNV8E0C?tag=whatever
     """
     # /dp/ASIN pattern (most common)
-    match = re.search(r'/dp/([A-Z0-9]{10})', url, re.IGNORECASE)
+    match = re.search(r"/dp/([A-Z0-9]{10})", url, re.IGNORECASE)
     if match:
         return match.group(1).upper()
 
     # /gp/product/ASIN pattern
-    match = re.search(r'/gp/product/([A-Z0-9]{10})', url, re.IGNORECASE)
+    match = re.search(r"/gp/product/([A-Z0-9]{10})", url, re.IGNORECASE)
     if match:
         return match.group(1).upper()
 
     # /gp/aw/d/ASIN pattern (mobile)
-    match = re.search(r'/gp/aw/d/([A-Z0-9]{10})', url, re.IGNORECASE)
+    match = re.search(r"/gp/aw/d/([A-Z0-9]{10})", url, re.IGNORECASE)
     if match:
         return match.group(1).upper()
 

@@ -68,10 +68,12 @@ class AldiSession:
     def __init__(self):
         self.session = requests.Session()
         self.session.verify = False
-        self.session.headers.update({
-            "User-Agent": random.choice(USER_AGENTS),
-            "Accept-Language": "en-US,en;q=0.9",
-        })
+        self.session.headers.update(
+            {
+                "User-Agent": random.choice(USER_AGENTS),
+                "Accept-Language": "en-US,en;q=0.9",
+            }
+        )
         self._authenticated = False
 
     def _establish_session(self) -> bool:
@@ -96,8 +98,7 @@ class AldiSession:
             # Check that we got the critical Instacart session cookie
             cookies = self.session.cookies.get_dict()
             has_session = any(
-                "instacart" in k.lower() or "ic" in k.lower()
-                for k in cookies
+                "instacart" in k.lower() or "ic" in k.lower() for k in cookies
             )
 
             if has_session:
@@ -255,7 +256,9 @@ class AldiSession:
         }
 
         try:
-            log.info(f"Fetching {len(product_ids)} items from Aldi IDP API (shop {shop_id})")
+            log.info(
+                f"Fetching {len(product_ids)} items from Aldi IDP API (shop {shop_id})"
+            )
             resp = self.session.get(url, headers=headers, timeout=15)
 
             if resp.status_code != 200:
@@ -373,8 +376,8 @@ class AldiSession:
 
             placements = (
                 data.get("data", {})
-                    .get("searchResultsPlacements", {})
-                    .get("placements", [])
+                .get("searchResultsPlacements", {})
+                .get("placements", [])
             )
             for placement in placements:
                 content = placement.get("content", {})

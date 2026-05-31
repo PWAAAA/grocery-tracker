@@ -11,8 +11,9 @@ log = logging.getLogger(__name__)
 _store_cache: dict[str, list[dict]] = {}
 
 
-def find_stores_by_zip(zip_code: str, session: Optional[PublixSession] = None,
-                       limit: int = 10) -> list[dict]:
+def find_stores_by_zip(
+    zip_code: str, session: Optional[PublixSession] = None, limit: int = 10
+) -> list[dict]:
     """Find nearby Publix stores for a given zip code.
 
     Returns list of dicts with keys: id, name, address, city, state, zip,

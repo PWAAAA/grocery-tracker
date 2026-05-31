@@ -115,22 +115,30 @@ def scrape_search(
         log.info(f"Walmart search '{query}': fetching page {page_num}")
 
         html = fetch_page(
-            url, zip_code, store_id,
+            url,
+            zip_code,
+            store_id,
             referer=referer,
             max_retries=max_retries,
         )
         if html is None:
-            log.warning(f"Walmart search '{query}': page {page_num} fetch returned no HTML")
+            log.warning(
+                f"Walmart search '{query}': page {page_num} fetch returned no HTML"
+            )
             break
 
         data = extract_next_data(html)
         if data is None:
-            log.warning(f"Walmart search '{query}': page {page_num} no __NEXT_DATA__ found")
+            log.warning(
+                f"Walmart search '{query}': page {page_num} no __NEXT_DATA__ found"
+            )
             break
 
         page_results = parse_search_results(data)
         if not page_results:
-            log.info(f"Walmart search '{query}': page {page_num} returned 0 results, stopping")
+            log.info(
+                f"Walmart search '{query}': page {page_num} returned 0 results, stopping"
+            )
             break
 
         # Deduplicate across pages (Walmart sometimes repeats sponsored items)
@@ -142,7 +150,9 @@ def scrape_search(
                 all_results.append(product)
                 new_count += 1
 
-        log.info(f"Walmart search '{query}': page {page_num} added {new_count} new results (total: {len(all_results)})")
+        log.info(
+            f"Walmart search '{query}': page {page_num} added {new_count} new results (total: {len(all_results)})"
+        )
 
         if len(all_results) >= limit:
             break
@@ -183,5 +193,5 @@ def extract_id_from_url(url: str) -> Optional[str]:
         https://www.walmart.com/ip/10450114
         walmart.com/ip/Whatever/10450114?some=param
     """
-    match = re.search(r'/ip/(?:[^/]+/)?(\d+)', url)
+    match = re.search(r"/ip/(?:[^/]+/)?(\d+)", url)
     return match.group(1) if match else None

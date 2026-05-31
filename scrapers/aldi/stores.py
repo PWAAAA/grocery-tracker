@@ -28,7 +28,9 @@ _store_cache: dict[str, list[dict]] = {}
 MAX_STORES = 15
 
 
-def find_stores_by_zip(zip_code: str, session: Optional[AldiSession] = None) -> list[dict]:
+def find_stores_by_zip(
+    zip_code: str, session: Optional[AldiSession] = None
+) -> list[dict]:
     """
     Find nearby Aldi shops for a given zip code.
 
@@ -73,7 +75,9 @@ def find_stores_by_zip(zip_code: str, session: Optional[AldiSession] = None) -> 
 
     if not pickup_shops:
         # Fall back to instore if no pickup shops
-        pickup_shops = [s for s in all_shops if s.get("fulfillment_option") == "instore"]
+        pickup_shops = [
+            s for s in all_shops if s.get("fulfillment_option") == "instore"
+        ]
 
     if not pickup_shops:
         log.warning(f"No Aldi shops found for zip {zip_code}")
@@ -84,11 +88,16 @@ def find_stores_by_zip(zip_code: str, session: Optional[AldiSession] = None) -> 
     stores = []
     for shop in pickup_shops[:MAX_STORES]:
         addr = shop.get("address", {})
-        address_str = ", ".join(filter(None, [
-            addr.get("street_address", ""),
-            addr.get("city", ""),
-            f"{addr.get('state', '')} {addr.get('postal_code', '')}".strip(),
-        ]))
+        address_str = ", ".join(
+            filter(
+                None,
+                [
+                    addr.get("street_address", ""),
+                    addr.get("city", ""),
+                    f"{addr.get('state', '')} {addr.get('postal_code', '')}".strip(),
+                ],
+            )
+        )
 
         if address_str in seen_addresses:
             continue
@@ -100,13 +109,15 @@ def find_stores_by_zip(zip_code: str, session: Optional[AldiSession] = None) -> 
         city = addr.get("city", "")
         label = f"{street}, {city}" if street and city else address_str
 
-        stores.append({
-            "shop_id": str(shop.get("id", "")),
-            "zone_id": "",
-            "name": f"ALDI - {label}",
-            "address": address_str,
-            "distance": None,
-        })
+        stores.append(
+            {
+                "shop_id": str(shop.get("id", "")),
+                "zone_id": "",
+                "name": f"ALDI - {label}",
+                "address": address_str,
+                "distance": None,
+            }
+        )
 
     log.info(f"Found {len(stores)} Aldi shop(s) near zip {zip_code}")
 

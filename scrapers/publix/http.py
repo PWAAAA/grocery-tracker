@@ -10,10 +10,13 @@ log = logging.getLogger(__name__)
 
 try:
     from curl_cffi import requests as cffi_requests
+
     HAS_CURL_CFFI = True
 except ImportError:
     HAS_CURL_CFFI = False
-    log.warning("curl_cffi not available — Publix scraper requires it for Akamai bypass")
+    log.warning(
+        "curl_cffi not available — Publix scraper requires it for Akamai bypass"
+    )
 
 
 class PublixSession:
@@ -80,8 +83,13 @@ class PublixSession:
             log.debug(f"Publix search warmup failed: {e}")
             return False
 
-    def get_json(self, url: str, params: dict, extra_headers: Optional[dict] = None,
-                 max_retries: int = config.MAX_RETRIES) -> Optional[dict | list]:
+    def get_json(
+        self,
+        url: str,
+        params: dict,
+        extra_headers: Optional[dict] = None,
+        max_retries: int = config.MAX_RETRIES,
+    ) -> Optional[dict | list]:
         """Make a GET request expecting JSON, with retry on failure."""
         if not self.establish():
             return None
@@ -96,11 +104,13 @@ class PublixSession:
                 if r.status_code == 200:
                     return r.json()
                 elif r.status_code == 403:
-                    log.warning(f"Publix API 403 on attempt {attempt + 1} — re-warming session")
+                    log.warning(
+                        f"Publix API 403 on attempt {attempt + 1} — re-warming session"
+                    )
                     self._warmed_up = False
                     if not self.establish():
                         continue
-                    backoff = config.BACKOFF_BASE * (2 ** attempt)
+                    backoff = config.BACKOFF_BASE * (2**attempt)
                     time.sleep(backoff)
                 else:
                     log.warning(f"Publix API returned {r.status_code}: {r.text[:200]}")
@@ -108,13 +118,18 @@ class PublixSession:
             except Exception as e:
                 log.error(f"Publix request error (attempt {attempt + 1}): {e}")
                 if attempt < max_retries - 1:
-                    time.sleep(config.BACKOFF_BASE * (2 ** attempt))
+                    time.sleep(config.BACKOFF_BASE * (2**attempt))
 
         return None
 
-    def post_json(self, url: str, json_body: dict, extra_headers: Optional[dict] = None,
-                  max_retries: int = config.MAX_RETRIES,
-                  cache_block: bool = False) -> Optional[dict | list]:
+    def post_json(
+        self,
+        url: str,
+        json_body: dict,
+        extra_headers: Optional[dict] = None,
+        max_retries: int = config.MAX_RETRIES,
+        cache_block: bool = False,
+    ) -> Optional[dict | list]:
         """Make a POST request with JSON body expecting JSON response, with retry on failure.
 
         Args:
@@ -141,11 +156,13 @@ class PublixSession:
                 if r.status_code == 200:
                     return r.json()
                 elif r.status_code == 403:
-                    log.warning(f"Publix POST 403 on attempt {attempt + 1} — re-warming session")
+                    log.warning(
+                        f"Publix POST 403 on attempt {attempt + 1} — re-warming session"
+                    )
                     self._warmed_up = False
                     if not self.establish():
                         continue
-                    backoff = config.BACKOFF_BASE * (2 ** attempt)
+                    backoff = config.BACKOFF_BASE * (2**attempt)
                     time.sleep(backoff)
                 else:
                     log.warning(f"Publix POST returned {r.status_code}: {r.text[:200]}")
@@ -153,10 +170,12 @@ class PublixSession:
             except Exception as e:
                 log.error(f"Publix POST error (attempt {attempt + 1}): {e}")
                 if attempt < max_retries - 1:
-                    time.sleep(config.BACKOFF_BASE * (2 ** attempt))
+                    time.sleep(config.BACKOFF_BASE * (2**attempt))
 
         if cache_block:
             self._graphql_blocked = True
-            log.warning("Publix GraphQL endpoint blocked — caching to skip future calls this session")
+            log.warning(
+                "Publix GraphQL endpoint blocked — caching to skip future calls this session"
+            )
 
         return None

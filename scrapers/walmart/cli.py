@@ -21,7 +21,9 @@ from .config import MIN_DELAY, MAX_DELAY
 from .http import HAS_CFFI
 from .api import scrape_search, scrape_product_list, extract_id_from_url
 
-logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s"
+)
 
 
 def main():
@@ -46,12 +48,26 @@ Examples:
   python -m scrapers.walmart.cli --zip 34747
         """,
     )
-    parser.add_argument("--find", nargs="+", type=str, help='Search queries to find product IDs (each in quotes)')
+    parser.add_argument(
+        "--find",
+        nargs="+",
+        type=str,
+        help="Search queries to find product IDs (each in quotes)",
+    )
     parser.add_argument("--ids", nargs="+", type=str, help="Product IDs to scrape")
     parser.add_argument("--url", type=str, help="Extract product ID from a Walmart URL")
-    parser.add_argument("--zip", type=str, default="32801", help="Zip code (default: 32801 Orlando)")
-    parser.add_argument("--store", type=str, default=None, help="Walmart store ID for exact store pricing")
-    parser.add_argument("--output", type=str, default="walmart_prices.json", help="Output JSON file")
+    parser.add_argument(
+        "--zip", type=str, default="32801", help="Zip code (default: 32801 Orlando)"
+    )
+    parser.add_argument(
+        "--store",
+        type=str,
+        default=None,
+        help="Walmart store ID for exact store pricing",
+    )
+    parser.add_argument(
+        "--output", type=str, default="walmart_prices.json", help="Output JSON file"
+    )
     args = parser.parse_args()
 
     print("\n" + "=" * 60)
@@ -93,13 +109,15 @@ Examples:
                 if not HAS_CFFI:
                     print("  Try: pip install curl_cffi")
                 else:
-                    print("  Walmart may be rate-limiting. Wait a few minutes and retry.")
+                    print(
+                        "  Walmart may be rate-limiting. Wait a few minutes and retry."
+                    )
                 print()
                 continue
 
             print(f"  Found {len(results)} products:\n")
             print(f"  {'#':<5} {'ID':<15} {'Price':>8}  {'Name'}")
-            print(f"  {'-'*5} {'-'*15} {'-'*8}  {'-'*45}")
+            print(f"  {'-' * 5} {'-' * 15} {'-' * 8}  {'-' * 45}")
 
             for item in results:
                 pos = len(all_search_results) + 1
@@ -129,7 +147,7 @@ Examples:
             print("  No selection made. Exiting.")
             return
 
-        tokens = re.split(r'[\s,]+', raw)
+        tokens = re.split(r"[\s,]+", raw)
         product_id_set = {item["product_id"] for item in all_search_results}
         selected_ids = []
 
@@ -146,18 +164,24 @@ Examples:
                 if token not in selected_ids:
                     selected_ids.append(token)
             else:
-                print(f"  WARNING: '{token}' is not a valid position or product ID — skipping.")
+                print(
+                    f"  WARNING: '{token}' is not a valid position or product ID — skipping."
+                )
 
         if not selected_ids:
             print("  No valid products selected. Exiting.")
             return
 
-        print(f"\n  Scraping {len(selected_ids)} product(s): {', '.join(selected_ids)}\n")
+        print(
+            f"\n  Scraping {len(selected_ids)} product(s): {', '.join(selected_ids)}\n"
+        )
 
-        scrape_results = scrape_product_list(selected_ids, zip_code=args.zip, store_id=args.store)
+        scrape_results = scrape_product_list(
+            selected_ids, zip_code=args.zip, store_id=args.store
+        )
 
         print(f"\n  {'Price':>8} | {'Product':<50} | {'Status'}")
-        print(f"  {'-'*8} | {'-'*50} | {'-'*12}")
+        print(f"  {'-' * 8} | {'-' * 50} | {'-' * 12}")
 
         for r in scrape_results:
             if r.error:
@@ -174,13 +198,13 @@ Examples:
 
     # ---- Mode: Scrape known product IDs ----
     product_ids = args.ids or [
-        "10450114",   # Great Value Whole Milk, 1 Gallon (confirmed working)
+        "10450114",  # Great Value Whole Milk, 1 Gallon (confirmed working)
     ]
 
     results = scrape_product_list(product_ids, zip_code=args.zip, store_id=args.store)
 
     print(f"\n  {'Price':>8} | {'Product':<50} | {'Status'}")
-    print(f"  {'-'*8} | {'-'*50} | {'-'*12}")
+    print(f"  {'-' * 8} | {'-' * 50} | {'-' * 12}")
 
     for r in results:
         if r.error:

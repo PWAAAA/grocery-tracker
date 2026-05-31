@@ -80,17 +80,21 @@ def _store_base_prices(products: list[dict], store_id: str = None):
     """Persist base prices extracted from deal data (best-effort)."""
     try:
         from database import store_publix_base_prices
+
         store_publix_base_prices(products, store_id)
     except Exception as e:
         log.debug(f"Could not store Publix base prices: {e}")
 
 
-def scrape_search(query: str, zip_code: str = config.DEFAULT_ZIP,
-                  store_id: Optional[str] = None,
-                  session: Optional[PublixSession] = None,
-                  limit: int = config.DEFAULT_SEARCH_LIMIT,
-                  include_tpr: bool = True,
-                  include_coupons: bool = True) -> list[dict]:
+def scrape_search(
+    query: str,
+    zip_code: str = config.DEFAULT_ZIP,
+    store_id: Optional[str] = None,
+    session: Optional[PublixSession] = None,
+    limit: int = config.DEFAULT_SEARCH_LIMIT,
+    include_tpr: bool = True,
+    include_coupons: bool = True,
+) -> list[dict]:
     """Search Publix deals/savings by keyword.
 
     Searches the savings API which includes weekly ad items (BOGOs, sale prices,
@@ -158,17 +162,18 @@ def scrape_search(query: str, zip_code: str = config.DEFAULT_ZIP,
         results.extend(eligible)
         log.info(f"Publix: added {len(eligible)} eligible products for '{query}'")
 
-    log.info(f"Publix search '{query}': {len(results)} results "
-             f"(store {store_id})")
+    log.info(f"Publix search '{query}': {len(results)} results (store {store_id})")
     trimmed = results[:limit]
     _store_base_prices(trimmed, store_id)
     return trimmed
 
 
-def scrape_weekly_ad(zip_code: str = config.DEFAULT_ZIP,
-                     store_id: Optional[str] = None,
-                     session: Optional[PublixSession] = None,
-                     category: Optional[str] = None) -> list[dict]:
+def scrape_weekly_ad(
+    zip_code: str = config.DEFAULT_ZIP,
+    store_id: Optional[str] = None,
+    session: Optional[PublixSession] = None,
+    category: Optional[str] = None,
+) -> list[dict]:
     """Fetch the full Publix weekly ad for a store.
 
     Args:
@@ -221,9 +226,12 @@ def scrape_weekly_ad(zip_code: str = config.DEFAULT_ZIP,
     return results
 
 
-def scrape_product(product_id: str, zip_code: str = config.DEFAULT_ZIP,
-                   store_id: Optional[str] = None,
-                   session: Optional[PublixSession] = None) -> Optional[dict]:
+def scrape_product(
+    product_id: str,
+    zip_code: str = config.DEFAULT_ZIP,
+    store_id: Optional[str] = None,
+    session: Optional[PublixSession] = None,
+) -> Optional[dict]:
     """Fetch a single Publix product/deal by ID.
 
     For weekly ad items (waId), uses the deal detail endpoint.
@@ -261,9 +269,12 @@ def scrape_product(product_id: str, zip_code: str = config.DEFAULT_ZIP,
     return None
 
 
-def scrape_product_list(product_ids: list[str], zip_code: str = config.DEFAULT_ZIP,
-                        store_id: Optional[str] = None,
-                        session: Optional[PublixSession] = None) -> list[dict]:
+def scrape_product_list(
+    product_ids: list[str],
+    zip_code: str = config.DEFAULT_ZIP,
+    store_id: Optional[str] = None,
+    session: Optional[PublixSession] = None,
+) -> list[dict]:
     """Fetch multiple Publix products with polite delays."""
     import time
     import random
@@ -310,6 +321,7 @@ def extract_id_from_url(url: str) -> Optional[str]:
 # Internal helpers
 # ---------------------------------------------------------------------------
 
+
 def _attach_coupons_to_products(products: list[dict], coupon_items: list[dict]):
     """Match digital coupons to products by brand and attach coupon info.
 
@@ -333,7 +345,7 @@ def _attach_coupons_to_products(products: list[dict], coupon_items: list[dict]):
             continue
 
         # A coupon brand like "Irish Spring or Softsoap" may list multiple brands
-        coupon_brands = [b.strip() for b in re.split(r'\s+or\s+', coupon_brand)]
+        coupon_brands = [b.strip() for b in re.split(r"\s+or\s+", coupon_brand)]
 
         matched = False
         for product in products:
@@ -341,8 +353,9 @@ def _attach_coupons_to_products(products: list[dict], coupon_items: list[dict]):
             if not product_brand:
                 continue
 
-            if not any(cb in product_brand or product_brand in cb
-                       for cb in coupon_brands):
+            if not any(
+                cb in product_brand or product_brand in cb for cb in coupon_brands
+            ):
                 continue
 
             # Always attach the coupon description text for display
@@ -370,13 +383,17 @@ def _attach_coupons_to_products(products: list[dict], coupon_items: list[dict]):
                     product["coupon_price"] = round(total_paid / total_qty, 2)
                 else:
                     per_unit_discount = coupon_value / min_qty
-                    product["coupon_price"] = round(product["price"] - per_unit_discount, 2)
+                    product["coupon_price"] = round(
+                        product["price"] - per_unit_discount, 2
+                    )
             matched = True
 
         if matched:
             log.debug(f"Attached coupon '{coupon_title}' to products")
         else:
-            log.debug(f"No products matched coupon '{coupon_title}' (brand: {coupon_brand})")
+            log.debug(
+                f"No products matched coupon '{coupon_title}' (brand: {coupon_brand})"
+            )
 
 
 def _resolve_store_id(zip_code: str, session: PublixSession) -> str:
@@ -422,7 +439,9 @@ def _search_savings(query: str, store_id: str, session: PublixSession) -> list[d
     return data.get("Savings", [])
 
 
-def _search_savings_tpr(query: str, store_id: str, session: PublixSession) -> list[dict]:
+def _search_savings_tpr(
+    query: str, store_id: str, session: PublixSession
+) -> list[dict]:
     """Get all TPR items and filter by keyword locally.
 
     The savings search endpoint doesn't always include TPR items,
@@ -457,11 +476,16 @@ def _search_savings_tpr(query: str, store_id: str, session: PublixSession) -> li
     query_words = query_lower.split()
     matched = []
     for item in all_tpr:
-        text = " ".join(filter(None, [
-            item.get("title", ""),
-            item.get("description", ""),
-            item.get("brand", ""),
-        ])).lower()
+        text = " ".join(
+            filter(
+                None,
+                [
+                    item.get("title", ""),
+                    item.get("description", ""),
+                    item.get("brand", ""),
+                ],
+            )
+        ).lower()
         if all(w in text for w in query_words):
             matched.append(item)
 
@@ -498,20 +522,25 @@ def _search_coupons(query: str, store_id: str, session: PublixSession) -> list[d
     query_words = query_lower.split()
     matched = []
     for item in all_coupons:
-        text = " ".join(filter(None, [
-            item.get("title", ""),
-            item.get("description", ""),
-            item.get("brand", ""),
-        ])).lower()
+        text = " ".join(
+            filter(
+                None,
+                [
+                    item.get("title", ""),
+                    item.get("description", ""),
+                    item.get("brand", ""),
+                ],
+            )
+        ).lower()
         if all(w in text for w in query_words):
             matched.append(item)
 
     return matched
 
 
-def _search_eligible_products(query: str, store_id: str,
-                              session: PublixSession,
-                              seen_ids: set) -> list[dict]:
+def _search_eligible_products(
+    query: str, store_id: str, session: PublixSession, seen_ids: set
+) -> list[dict]:
     """Search eligible products from umbrella weekly ad deals.
 
     Fetches the full weekly ad, collects promo group IDs from deals,
@@ -557,8 +586,7 @@ def _search_eligible_products(query: str, store_id: str,
         return []
 
     # Query GraphQL for eligible products, filtering by search keyword
-    products = _fetch_eligible_products(all_promo_ids, store_id, session,
-                                        keyword=query)
+    products = _fetch_eligible_products(all_promo_ids, store_id, session, keyword=query)
 
     # Dedup against already-seen product IDs
     results = []
@@ -571,9 +599,9 @@ def _search_eligible_products(query: str, store_id: str,
     return results
 
 
-def _fetch_eligible_products(promo_group_ids: list[str], store_id: str,
-                             session: PublixSession,
-                             keyword: str = "") -> list[dict]:
+def _fetch_eligible_products(
+    promo_group_ids: list[str], store_id: str, session: PublixSession, keyword: str = ""
+) -> list[dict]:
     """Fetch eligible products from the GraphQL endpoint by promo group IDs.
 
     Args:
@@ -626,8 +654,9 @@ def _fetch_eligible_products(promo_group_ids: list[str], store_id: str,
     )
 
     if not data:
-        log.warning("Publix eligible products endpoint returned no data "
-                     "(may be Akamai-blocked)")
+        log.warning(
+            "Publix eligible products endpoint returned no data (may be Akamai-blocked)"
+        )
         return []
 
     # Navigate the GraphQL response structure
@@ -664,11 +693,18 @@ def _is_weekly_ad_id(product_id: str) -> bool:
     except ValueError:
         pass
     # UUID pattern
-    return bool(re.match(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
-                         product_id, re.I))
+    return bool(
+        re.match(
+            r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+            product_id,
+            re.I,
+        )
+    )
 
 
-def _fetch_weekly_ad_deal(deal_id: str, store_id: str, session: PublixSession) -> Optional[dict]:
+def _fetch_weekly_ad_deal(
+    deal_id: str, store_id: str, session: PublixSession
+) -> Optional[dict]:
     """Fetch a single weekly ad deal by its waId."""
     data = session.get_json(
         config.DEAL_DETAIL_ENDPOINT,
@@ -682,8 +718,9 @@ def _fetch_weekly_ad_deal(deal_id: str, store_id: str, session: PublixSession) -
     return savings_item_to_product_dict(data)
 
 
-def _fetch_tpr_product(base_product_id: str, store_id: str,
-                       session: PublixSession) -> Optional[dict]:
+def _fetch_tpr_product(
+    base_product_id: str, store_id: str, session: PublixSession
+) -> Optional[dict]:
     """Find a TPR item by its baseProductId."""
     # Fetch all TPRs and find the matching one
     params = {

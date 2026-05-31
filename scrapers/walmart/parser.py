@@ -140,7 +140,9 @@ def parse_product_page(data: dict, product_id: str) -> WalmartProduct:
         currency = current.get("currencyUnit", "USD")
 
         unit_price_node = price_info.get("unitPrice", {})
-        unit_price_string = unit_price_node.get("priceString") if unit_price_node else None
+        unit_price_string = (
+            unit_price_node.get("priceString") if unit_price_node else None
+        )
 
         on_sale = price_info.get("isPriceReduced", False)
 
@@ -259,26 +261,36 @@ def parse_search_results(data: dict) -> list[dict]:
                 # vs shipping-only. fulfillmentBadgeGroups contains badges
                 # like FF_PICKUP (in-store) or FF_SHIPPING (ship-to-home).
                 badge_groups = item.get("fulfillmentBadgeGroups") or []
-                badge_keys = {bg.get("key") for bg in badge_groups if isinstance(bg, dict)}
+                badge_keys = {
+                    bg.get("key") for bg in badge_groups if isinstance(bg, dict)
+                }
                 in_store = "FF_PICKUP" in badge_keys
-                log.debug(f"  [{pid}] badges: {badge_keys}, fulfillmentType: {item.get('fulfillmentType')}")
+                log.debug(
+                    f"  [{pid}] badges: {badge_keys}, fulfillmentType: {item.get('fulfillmentType')}"
+                )
 
-                results.append({
-                    "name": item.get("name"),
-                    "product_id": pid,
-                    "price": item.get("price"),
-                    "unit_price_string": unit_price_string,
-                    "rating": item.get("averageRating"),
-                    "image": item.get("image"),
-                    "url": f"https://www.walmart.com/ip/{pid}",
-                    "sponsored": item.get("isSponsoredFlag", False),
-                    "in_store": in_store,
-                })
+                results.append(
+                    {
+                        "name": item.get("name"),
+                        "product_id": pid,
+                        "price": item.get("price"),
+                        "unit_price_string": unit_price_string,
+                        "rating": item.get("averageRating"),
+                        "image": item.get("image"),
+                        "url": f"https://www.walmart.com/ip/{pid}",
+                        "sponsored": item.get("isSponsoredFlag", False),
+                        "in_store": in_store,
+                    }
+                )
             except Exception as e:
                 log.warning(f"Skipping malformed search item: {e}")
 
     in_store_count = sum(1 for r in results if r.get("in_store"))
-    log.info(f"Parsed {len(results)} products from {total_items} items "
-             f"({skipped_non_product} non-product, {skipped_dupes} dupes)")
-    log.info(f"  In-store: {in_store_count}, Shipping-only: {len(results) - in_store_count}")
+    log.info(
+        f"Parsed {len(results)} products from {total_items} items "
+        f"({skipped_non_product} non-product, {skipped_dupes} dupes)"
+    )
+    log.info(
+        f"  In-store: {in_store_count}, Shipping-only: {len(results) - in_store_count}"
+    )
     return results

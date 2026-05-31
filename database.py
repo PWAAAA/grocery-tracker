@@ -17,6 +17,7 @@ TURSO_TOKEN = os.environ.get("TURSO_TOKEN")
 def get_connection():
     if TURSO_URL and TURSO_TOKEN:
         import libsql_experimental as libsql
+
         conn = libsql.connect(database=TURSO_URL, auth_token=TURSO_TOKEN)
         conn.row_factory = sqlite3.Row
         return conn
@@ -92,7 +93,9 @@ def init_db():
         pass  # column already exists
 
     try:
-        conn.execute("ALTER TABLE ingredient_products ADD COLUMN density_oz_per_cup REAL")
+        conn.execute(
+            "ALTER TABLE ingredient_products ADD COLUMN density_oz_per_cup REAL"
+        )
     except Exception:
         pass  # column already exists
 
@@ -172,9 +175,15 @@ def init_db():
             scraped_at     TEXT NOT NULL DEFAULT (datetime('now'))
         )
     """)
-    conn.execute("CREATE INDEX IF NOT EXISTS idx_ph_key_time  ON price_history (product_key, scraped_at)")
-    conn.execute("CREATE INDEX IF NOT EXISTS idx_ph_store_pid ON price_history (store, product_id)")
-    conn.execute("CREATE INDEX IF NOT EXISTS idx_ph_scraped   ON price_history (scraped_at)")
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_ph_key_time  ON price_history (product_key, scraped_at)"
+    )
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_ph_store_pid ON price_history (store, product_id)"
+    )
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_ph_scraped   ON price_history (scraped_at)"
+    )
 
     # Most recent observation per product, via window function.
     conn.execute("""
@@ -190,7 +199,10 @@ def init_db():
 
     # Migrate existing single-product data from recipe_ingredients to ingredient_products
     try:
-        cols = [row[1] for row in conn.execute("PRAGMA table_info(recipe_ingredients)").fetchall()]
+        cols = [
+            row[1]
+            for row in conn.execute("PRAGMA table_info(recipe_ingredients)").fetchall()
+        ]
         if "product_url" in cols:
             rows = conn.execute(
                 "SELECT id, product_url, product_name, product_price, product_size, "
@@ -200,7 +212,7 @@ def init_db():
             for row in rows:
                 existing = conn.execute(
                     "SELECT id FROM ingredient_products WHERE ingredient_id = ? AND product_url = ?",
-                    (row[0], row[1])
+                    (row[0], row[1]),
                 ).fetchone()
                 if not existing:
                     conn.execute(
@@ -208,7 +220,17 @@ def init_db():
                         "(ingredient_id, product_url, product_name, product_price, product_size, "
                         "product_store, product_unit_price, ingredient_cost, cost_breakdown, position) "
                         "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0)",
-                        (row[0], row[1], row[2], row[3], row[4], row[5], row[6], row[7], row[8]),
+                        (
+                            row[0],
+                            row[1],
+                            row[2],
+                            row[3],
+                            row[4],
+                            row[5],
+                            row[6],
+                            row[7],
+                            row[8],
+                        ),
                     )
     except Exception:
         pass
@@ -219,7 +241,9 @@ def init_db():
 
 def get_grocery_items() -> list[dict]:
     conn = get_connection()
-    rows = conn.execute("SELECT id, value, type, store FROM grocery_items ORDER BY position").fetchall()
+    rows = conn.execute(
+        "SELECT id, value, type, store FROM grocery_items ORDER BY position"
+    ).fetchall()
     conn.close()
     return [dict(row) for row in rows]
 
@@ -237,12 +261,14 @@ def set_grocery_items(items: list[dict]):
     conn.close()
 
 
-
 # ── Recipe CRUD ────────────────────────────────────────────────────
+
 
 def get_recipes() -> list[dict]:
     conn = get_connection()
-    rows = conn.execute("SELECT id, name, servings, notes, image_url FROM recipes ORDER BY position").fetchall()
+    rows = conn.execute(
+        "SELECT id, name, servings, notes, image_url FROM recipes ORDER BY position"
+    ).fetchall()
     recipes = []
     for row in rows:
         r = dict(row)
@@ -258,11 +284,17 @@ def get_recipes() -> list[dict]:
                GROUP BY ri.id""",
             (r["id"],),
         ).fetchall()
-        recipe_cost = sum(c["cheapest_cost"] for c in costs if c["cheapest_cost"] is not None)
-        shelf_total = sum(c["shelf_price"] for c in costs if c["shelf_price"] is not None)
+        recipe_cost = sum(
+            c["cheapest_cost"] for c in costs if c["cheapest_cost"] is not None
+        )
+        shelf_total = sum(
+            c["shelf_price"] for c in costs if c["shelf_price"] is not None
+        )
         r["recipe_cost"] = recipe_cost
         r["shelf_price"] = shelf_total
-        r["cost_per_serving"] = recipe_cost / r["servings"] if r["servings"] and r["servings"] > 0 else 0
+        r["cost_per_serving"] = (
+            recipe_cost / r["servings"] if r["servings"] and r["servings"] > 0 else 0
+        )
         recipes.append(r)
     conn.close()
     return recipes
@@ -270,7 +302,10 @@ def get_recipes() -> list[dict]:
 
 def get_recipe(recipe_id: int) -> dict | None:
     conn = get_connection()
-    row = conn.execute("SELECT id, name, servings, notes, image_url FROM recipes WHERE id = ?", (recipe_id,)).fetchone()
+    row = conn.execute(
+        "SELECT id, name, servings, notes, image_url FROM recipes WHERE id = ?",
+        (recipe_id,),
+    ).fetchone()
     if not row:
         conn.close()
         return None
@@ -297,9 +332,13 @@ def get_recipe(recipe_id: int) -> dict | None:
     return recipe
 
 
-def create_recipe(name: str, servings: int = 1, notes: str = "", image_url: str = None) -> dict:
+def create_recipe(
+    name: str, servings: int = 1, notes: str = "", image_url: str = None
+) -> dict:
     conn = get_connection()
-    max_pos = conn.execute("SELECT COALESCE(MAX(position), -1) FROM recipes").fetchone()[0]
+    max_pos = conn.execute(
+        "SELECT COALESCE(MAX(position), -1) FROM recipes"
+    ).fetchone()[0]
     cur = conn.execute(
         "INSERT INTO recipes (name, servings, notes, image_url, position) VALUES (?, ?, ?, ?, ?)",
         (name, servings, notes, image_url, max_pos + 1),
@@ -307,23 +346,42 @@ def create_recipe(name: str, servings: int = 1, notes: str = "", image_url: str 
     recipe_id = cur.lastrowid
     conn.commit()
     conn.close()
-    return {"id": recipe_id, "name": name, "servings": servings, "notes": notes, "image_url": image_url, "ingredients": []}
+    return {
+        "id": recipe_id,
+        "name": name,
+        "servings": servings,
+        "notes": notes,
+        "image_url": image_url,
+        "ingredients": [],
+    }
 
 
-def update_recipe(recipe_id: int, name: str = None, servings: int = None, notes: str = None, image_url: str = None) -> dict | None:
+def update_recipe(
+    recipe_id: int,
+    name: str = None,
+    servings: int = None,
+    notes: str = None,
+    image_url: str = None,
+) -> dict | None:
     conn = get_connection()
-    existing = conn.execute("SELECT id FROM recipes WHERE id = ?", (recipe_id,)).fetchone()
+    existing = conn.execute(
+        "SELECT id FROM recipes WHERE id = ?", (recipe_id,)
+    ).fetchone()
     if not existing:
         conn.close()
         return None
     if name is not None:
         conn.execute("UPDATE recipes SET name = ? WHERE id = ?", (name, recipe_id))
     if servings is not None:
-        conn.execute("UPDATE recipes SET servings = ? WHERE id = ?", (servings, recipe_id))
+        conn.execute(
+            "UPDATE recipes SET servings = ? WHERE id = ?", (servings, recipe_id)
+        )
     if notes is not None:
         conn.execute("UPDATE recipes SET notes = ? WHERE id = ?", (notes, recipe_id))
     if image_url is not None:
-        conn.execute("UPDATE recipes SET image_url = ? WHERE id = ?", (image_url, recipe_id))
+        conn.execute(
+            "UPDATE recipes SET image_url = ? WHERE id = ?", (image_url, recipe_id)
+        )
     conn.commit()
     conn.close()
     return get_recipe(recipe_id)
@@ -339,9 +397,13 @@ def delete_recipe(recipe_id: int) -> bool:
     return deleted
 
 
-def add_ingredient(recipe_id: int, name: str, quantity: float = None, unit: str = None) -> dict | None:
+def add_ingredient(
+    recipe_id: int, name: str, quantity: float = None, unit: str = None
+) -> dict | None:
     conn = get_connection()
-    exists = conn.execute("SELECT id FROM recipes WHERE id = ?", (recipe_id,)).fetchone()
+    exists = conn.execute(
+        "SELECT id FROM recipes WHERE id = ?", (recipe_id,)
+    ).fetchone()
     if not exists:
         conn.close()
         return None
@@ -357,24 +419,44 @@ def add_ingredient(recipe_id: int, name: str, quantity: float = None, unit: str 
     conn.commit()
     conn.close()
     return {
-        "id": ing_id, "name": name, "quantity": quantity, "unit": unit,
-        "product_url": None, "product_name": None, "product_price": None,
-        "product_size": None, "product_store": None, "product_unit_price": None,
-        "ingredient_cost": None, "cost_breakdown": None, "position": max_pos + 1,
+        "id": ing_id,
+        "name": name,
+        "quantity": quantity,
+        "unit": unit,
+        "product_url": None,
+        "product_name": None,
+        "product_price": None,
+        "product_size": None,
+        "product_store": None,
+        "product_unit_price": None,
+        "ingredient_cost": None,
+        "cost_breakdown": None,
+        "position": max_pos + 1,
         "products": [],
     }
 
 
 def update_ingredient(ingredient_id: int, **fields) -> dict | None:
     conn = get_connection()
-    row = conn.execute("SELECT recipe_id FROM recipe_ingredients WHERE id = ?", (ingredient_id,)).fetchone()
+    row = conn.execute(
+        "SELECT recipe_id FROM recipe_ingredients WHERE id = ?", (ingredient_id,)
+    ).fetchone()
     if not row:
         conn.close()
         return None
     allowed = {
-        "name", "quantity", "unit", "product_url", "product_name", "product_price",
-        "product_size", "product_store", "product_unit_price", "ingredient_cost",
-        "cost_breakdown", "position",
+        "name",
+        "quantity",
+        "unit",
+        "product_url",
+        "product_name",
+        "product_price",
+        "product_size",
+        "product_store",
+        "product_unit_price",
+        "ingredient_cost",
+        "cost_breakdown",
+        "position",
     }
     updates = {k: v for k, v in fields.items() if k in allowed}
     if updates:
@@ -396,7 +478,9 @@ def update_ingredient(ingredient_id: int, **fields) -> dict | None:
 
 def delete_ingredient(ingredient_id: int) -> bool:
     conn = get_connection()
-    conn.execute("DELETE FROM ingredient_products WHERE ingredient_id = ?", (ingredient_id,))
+    conn.execute(
+        "DELETE FROM ingredient_products WHERE ingredient_id = ?", (ingredient_id,)
+    )
     cur = conn.execute("DELETE FROM recipe_ingredients WHERE id = ?", (ingredient_id,))
     conn.commit()
     deleted = cur.rowcount > 0
@@ -405,6 +489,7 @@ def delete_ingredient(ingredient_id: int) -> bool:
 
 
 # ── Ingredient Products CRUD ──────────────────────────────────────
+
 
 def get_ingredient_products(ingredient_id: int) -> list[dict]:
     conn = get_connection()
@@ -448,7 +533,8 @@ def add_ingredient_product(ingredient_id: int, **fields) -> dict:
     conn.commit()
     conn.close()
     return {
-        "id": product_id, "ingredient_id": ingredient_id,
+        "id": product_id,
+        "ingredient_id": ingredient_id,
         "product_url": fields.get("product_url"),
         "product_name": fields.get("product_name"),
         "product_price": fields.get("product_price"),
@@ -464,7 +550,12 @@ def add_ingredient_product(ingredient_id: int, **fields) -> dict:
 
 
 def update_ingredient_product(product_id: int, **fields) -> bool:
-    allowed = {"ingredient_cost", "cost_breakdown", "density_oz_per_cup", "std_units_json"}
+    allowed = {
+        "ingredient_cost",
+        "cost_breakdown",
+        "density_oz_per_cup",
+        "std_units_json",
+    }
     updates = {k: v for k, v in fields.items() if k in allowed}
     if not updates:
         return False
@@ -503,10 +594,17 @@ def get_cheapest_product(ingredient_id: int) -> dict | None:
 
 # ── Publix Base Prices ────────────────────────────────────────────
 
-def upsert_publix_base_price(name: str, base_price: float, brand: str = None,
-                              size: str = None, product_id: str = None,
-                              per_lb: bool = False, store_id: str = None,
-                              source: str = None):
+
+def upsert_publix_base_price(
+    name: str,
+    base_price: float,
+    brand: str = None,
+    size: str = None,
+    product_id: str = None,
+    per_lb: bool = False,
+    store_id: str = None,
+    source: str = None,
+):
     """Store or update a known Publix base price.
 
     Uses product_id (RIO-PCI-*) as primary key when available,
@@ -532,7 +630,15 @@ def upsert_publix_base_price(name: str, base_price: float, brand: str = None,
             "UPDATE publix_base_prices SET base_price = ?, size = ?, per_lb = ?, "
             "store_id = ?, source = ?, last_seen = datetime('now'), "
             "product_id = COALESCE(?, product_id) WHERE id = ?",
-            (base_price, size, int(per_lb), store_id, source, product_id, existing["id"]),
+            (
+                base_price,
+                size,
+                int(per_lb),
+                store_id,
+                source,
+                product_id,
+                existing["id"],
+            ),
         )
     else:
         conn.execute(
@@ -554,7 +660,9 @@ def store_publix_base_prices(products: list[dict], store_id: str = None):
     """
     for p in products:
         bp = p.get("base_price")
-        rio_pid = p.get("product_id") if p.get("product_id", "").startswith("RIO-") else None
+        rio_pid = (
+            p.get("product_id") if p.get("product_id", "").startswith("RIO-") else None
+        )
 
         if bp is not None:
             per_lb = p.get("deal", {}).get("per_lb", False)
@@ -587,11 +695,19 @@ def store_publix_base_prices(products: list[dict], store_id: str = None):
             )
 
 
-def upsert_publix_unknown_price(name: str, reason: str, brand: str = None,
-                                 size: str = None, product_id: str = None,
-                                 sale_price: float = None, deal_type: str = None,
-                                 deal_text: str = None, url: str = None,
-                                 store_id: str = None, source: str = None):
+def upsert_publix_unknown_price(
+    name: str,
+    reason: str,
+    brand: str = None,
+    size: str = None,
+    product_id: str = None,
+    sale_price: float = None,
+    deal_type: str = None,
+    deal_text: str = None,
+    url: str = None,
+    store_id: str = None,
+    source: str = None,
+):
     """Store a Publix deal item whose base price could not be determined."""
     conn = get_connection()
 
@@ -612,8 +728,18 @@ def upsert_publix_unknown_price(name: str, reason: str, brand: str = None,
             "UPDATE publix_unknown_prices SET sale_price = ?, deal_type = ?, "
             "deal_text = ?, reason = ?, url = ?, size = ?, store_id = ?, source = ?, "
             "last_seen = datetime('now'), product_id = COALESCE(?, product_id) WHERE id = ?",
-            (sale_price, deal_type, deal_text, reason, url, size, store_id, source,
-             product_id, existing["id"]),
+            (
+                sale_price,
+                deal_type,
+                deal_text,
+                reason,
+                url,
+                size,
+                store_id,
+                source,
+                product_id,
+                existing["id"],
+            ),
         )
     else:
         conn.execute(
@@ -621,8 +747,19 @@ def upsert_publix_unknown_price(name: str, reason: str, brand: str = None,
             "(product_id, name, brand, size, sale_price, deal_type, deal_text, "
             "reason, url, store_id, source) "
             "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-            (product_id, name, brand, size, sale_price, deal_type, deal_text,
-             reason, url, store_id, source),
+            (
+                product_id,
+                name,
+                brand,
+                size,
+                sale_price,
+                deal_type,
+                deal_text,
+                reason,
+                url,
+                store_id,
+                source,
+            ),
         )
 
     conn.commit()
@@ -661,8 +798,9 @@ def _classify_missing_base_price(product: dict) -> str:
     return f"{dt}_unknown"
 
 
-def get_publix_base_price(name: str = None, brand: str = None,
-                           product_id: str = None) -> dict | None:
+def get_publix_base_price(
+    name: str = None, brand: str = None, product_id: str = None
+) -> dict | None:
     """Look up a stored Publix base price."""
     conn = get_connection()
     row = None

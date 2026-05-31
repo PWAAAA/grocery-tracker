@@ -42,7 +42,7 @@ def _parse_price(price_str: Optional[str]) -> Optional[float]:
     """Parse a price string like '$3.28' or '$12.99' into a float."""
     if not price_str:
         return None
-    cleaned = re.sub(r'[^\d.]', '', price_str)
+    cleaned = re.sub(r"[^\d.]", "", price_str)
     try:
         return float(cleaned)
     except (ValueError, TypeError):
@@ -51,7 +51,7 @@ def _parse_price(price_str: Optional[str]) -> Optional[float]:
 
 def _extract_asin_from_link(href: str) -> Optional[str]:
     """Extract ASIN from an Amazon product link."""
-    match = re.search(r'/dp/([A-Z0-9]{10})', href)
+    match = re.search(r"/dp/([A-Z0-9]{10})", href)
     return match.group(1) if match else None
 
 
@@ -77,18 +77,24 @@ def _extract_serving_size_from_page(soup: BeautifulSoup) -> Optional[str]:
                     if len(cells) >= 2:
                         return cells[1].get_text(strip=True)
                     # Might be all in one cell
-                    match = re.search(r'serving size\s*[:\-]?\s*(.+)', row_text, re.IGNORECASE)
+                    match = re.search(
+                        r"serving size\s*[:\-]?\s*(.+)", row_text, re.IGNORECASE
+                    )
                     if match:
                         return match.group(1).strip()
 
     # Look in "important information" or product details sections
-    for div_id in ("important-information", "productDetails_feature_div",
-                    "detail-bullets_feature_div", "productDescription"):
+    for div_id in (
+        "important-information",
+        "productDetails_feature_div",
+        "detail-bullets_feature_div",
+        "productDescription",
+    ):
         div = soup.find("div", {"id": div_id})
         if not div:
             continue
         text = div.get_text(" ", strip=True)
-        match = re.search(r'serving size\s*[:\-]?\s*([^\n,;]+)', text, re.IGNORECASE)
+        match = re.search(r"serving size\s*[:\-]?\s*([^\n,;]+)", text, re.IGNORECASE)
         if match:
             return match.group(1).strip()
 
@@ -123,8 +129,8 @@ def parse_product_page(html: str, product_id: str) -> AmazonProduct:
         if brand_el:
             brand_text = brand_el.get_text(strip=True)
             # Strip "Visit the X Store" or "Brand: X" prefixes
-            brand_text = re.sub(r'^(Visit the |Brand:\s*)', '', brand_text)
-            brand_text = re.sub(r'\s*Store$', '', brand_text)
+            brand_text = re.sub(r"^(Visit the |Brand:\s*)", "", brand_text)
+            brand_text = re.sub(r"\s*Store$", "", brand_text)
             brand = brand_text if brand_text else None
 
         # --- Price ---
@@ -132,8 +138,12 @@ def parse_product_page(html: str, product_id: str) -> AmazonProduct:
         price_string = None
 
         # Try multiple price locations
-        for price_container_id in ("corePrice_feature_div", "unifiedPrice_feature_div",
-                                    "apex_offerDisplay_desktop", "price"):
+        for price_container_id in (
+            "corePrice_feature_div",
+            "unifiedPrice_feature_div",
+            "apex_offerDisplay_desktop",
+            "price",
+        ):
             container = soup.find("div", {"id": price_container_id})
             if not container:
                 container = soup.find("div", {"id": price_container_id})
@@ -165,7 +175,7 @@ def parse_product_page(html: str, product_id: str) -> AmazonProduct:
         apex_label = soup.find("span", class_="apex-priceperunit-accessibility-label")
         if apex_label:
             apex_text = apex_label.get_text(strip=True)
-            m = re.search(r'(\$[\d.]+)\s*per\s+(.+)', apex_text, re.IGNORECASE)
+            m = re.search(r"(\$[\d.]+)\s*per\s+(.+)", apex_text, re.IGNORECASE)
             if m:
                 unit_price_string = f"{m.group(1)}/{m.group(2).strip()}"
 
@@ -174,30 +184,40 @@ def parse_product_page(html: str, product_id: str) -> AmazonProduct:
             core_div = soup.find("div", {"id": "corePrice_feature_div"})
             if core_div:
                 core_text = core_div.get_text(" ", strip=True)
-                m = re.search(r'\(\s*(\$[\d.]+)\s*/\s*([^)]+)\)', core_text)
+                m = re.search(r"\(\s*(\$[\d.]+)\s*/\s*([^)]+)\)", core_text)
                 if m:
                     unit_price_string = f"{m.group(1)}/{m.group(2).strip()}"
 
         # Strategy 3: small a-price span with unit label nearby
         if not unit_price_string:
-            unit_price_el = soup.find("span", class_="a-price", attrs={"data-a-size": "s"})
+            unit_price_el = soup.find(
+                "span", class_="a-price", attrs={"data-a-size": "s"}
+            )
             if unit_price_el:
                 parent = unit_price_el.parent
                 if parent:
                     parent_text = parent.get_text(" ", strip=True)
-                    m = re.search(r'\(\s*(\$[\d.]+)\s*/\s*([^)]+)\)', parent_text)
+                    m = re.search(r"\(\s*(\$[\d.]+)\s*/\s*([^)]+)\)", parent_text)
                     if m:
                         unit_price_string = f"{m.group(1)}/{m.group(2).strip()}"
 
         # Strategy 4: broad regex scan for "$X.XX / unit" or "$X.XX per unit" anywhere in price area
         if not unit_price_string:
-            for div_id in ("corePrice_feature_div", "unifiedPrice_feature_div",
-                           "apex_offerDisplay_desktop", "price"):
+            for div_id in (
+                "corePrice_feature_div",
+                "unifiedPrice_feature_div",
+                "apex_offerDisplay_desktop",
+                "price",
+            ):
                 div = soup.find("div", {"id": div_id})
                 if not div:
                     continue
                 div_text = div.get_text(" ", strip=True)
-                m = re.search(r'(\$[\d.]+)\s*(?:/|per)\s+([\w\s]+?)(?:\s*[)\]]|$)', div_text, re.IGNORECASE)
+                m = re.search(
+                    r"(\$[\d.]+)\s*(?:/|per)\s+([\w\s]+?)(?:\s*[)\]]|$)",
+                    div_text,
+                    re.IGNORECASE,
+                )
                 if m:
                     unit_price_string = f"{m.group(1)}/{m.group(2).strip()}"
                     break
@@ -241,7 +261,12 @@ def parse_product_page(html: str, product_id: str) -> AmazonProduct:
             value = row.find("td", class_="a-span9")
             if label and value:
                 label_text = label.get_text(strip=True).lower()
-                if label_text in ("size", "item weight", "package weight", "net weight"):
+                if label_text in (
+                    "size",
+                    "item weight",
+                    "package weight",
+                    "net weight",
+                ):
                     size = value.get_text(strip=True)
                     break
 
@@ -358,14 +383,16 @@ def parse_search_results(html: str) -> list[dict]:
             card_text = card.get_text(" ", strip=True)
             # Match "$X.XX /Ounce", "$X.XX /Fl Oz", "$X.XX /Count", etc.
             unit_match = re.search(
-                r'(\$[\d.]+)\s*/\s*((?:Fl(?:uid)?\s*)?(?:Ounce|Oz|Count|lb|Pound|Each|Gram))',
-                card_text, re.IGNORECASE
+                r"(\$[\d.]+)\s*/\s*((?:Fl(?:uid)?\s*)?(?:Ounce|Oz|Count|lb|Pound|Each|Gram))",
+                card_text,
+                re.IGNORECASE,
             )
             if not unit_match:
                 # Match "$X.XX per fluid ounce", "$X.XX per ounce", etc.
                 unit_match = re.search(
-                    r'(\$[\d.]+)\s+per\s+((?:fluid\s*)?(?:ounce|oz|count|lb|pound|each|gram))',
-                    card_text, re.IGNORECASE
+                    r"(\$[\d.]+)\s+per\s+((?:fluid\s*)?(?:ounce|oz|count|lb|pound|each|gram))",
+                    card_text,
+                    re.IGNORECASE,
                 )
             if unit_match:
                 unit_price_string = f"{unit_match.group(1)}/{unit_match.group(2)}"
@@ -385,17 +412,20 @@ def parse_search_results(html: str) -> list[dict]:
 
             # --- Fresh detection ---
             # Products from Whole Foods Market, Amazon Fresh, or Amazon Kitchen
-            is_fresh = bool(re.search(
-                r'Whole Foods|Amazon Fresh|Amazon Kitchen',
-                name, re.IGNORECASE
-            ))
+            is_fresh = bool(
+                re.search(
+                    r"Whole Foods|Amazon Fresh|Amazon Kitchen", name, re.IGNORECASE
+                )
+            )
             # Fresh items are also considered Prime-eligible (delivered by Amazon)
             if is_fresh:
                 is_prime = True
 
             # --- Sponsored ---
             sponsored = False
-            sponsored_el = card.find("span", string=re.compile(r"Sponsored", re.IGNORECASE))
+            sponsored_el = card.find(
+                "span", string=re.compile(r"Sponsored", re.IGNORECASE)
+            )
             if sponsored_el:
                 sponsored = True
 
@@ -404,32 +434,36 @@ def parse_search_results(html: str) -> list[dict]:
             rating_el = card.find("span", class_="a-icon-alt")
             if rating_el:
                 rating_text = rating_el.get_text(strip=True)
-                rating_match = re.search(r'([\d.]+)\s*out of', rating_text)
+                rating_match = re.search(r"([\d.]+)\s*out of", rating_text)
                 if rating_match:
                     try:
                         rating = float(rating_match.group(1))
                     except ValueError:
                         pass
 
-            results.append({
-                "name": name,
-                "product_id": asin,
-                "price": price,
-                "price_string": price_string,
-                "unit_price_string": unit_price_string,
-                "rating": rating,
-                "image": image,
-                "url": link or f"https://www.amazon.com/dp/{asin}",
-                "sponsored": sponsored,
-                "is_prime": is_prime,
-                "is_fresh": is_fresh,
-            })
+            results.append(
+                {
+                    "name": name,
+                    "product_id": asin,
+                    "price": price,
+                    "price_string": price_string,
+                    "unit_price_string": unit_price_string,
+                    "rating": rating,
+                    "image": image,
+                    "url": link or f"https://www.amazon.com/dp/{asin}",
+                    "sponsored": sponsored,
+                    "is_prime": is_prime,
+                    "is_fresh": is_fresh,
+                }
+            )
 
         except Exception as e:
             log.warning(f"Skipping malformed search result: {e}")
 
     prime_count = sum(1 for r in results if r.get("is_prime"))
     fresh_count = sum(1 for r in results if r.get("is_fresh"))
-    log.info(f"Parsed {len(results)} products from {len(cards)} search result cards "
-             f"(Prime: {prime_count}, Fresh: {fresh_count})")
+    log.info(
+        f"Parsed {len(results)} products from {len(cards)} search result cards "
+        f"(Prime: {prime_count}, Fresh: {fresh_count})"
+    )
     return results

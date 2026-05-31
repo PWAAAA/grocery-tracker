@@ -16,6 +16,7 @@ from typing import Optional
 @dataclass
 class WalmartProduct:
     """Result from scraping a single Walmart product page."""
+
     name: str
     product_id: str
     price: Optional[float]
@@ -35,6 +36,7 @@ class WalmartProduct:
 @dataclass
 class AldiProduct:
     """Result from scraping an Aldi product via GraphQL."""
+
     name: str
     product_id: str
     price: Optional[float]
@@ -56,6 +58,7 @@ class AldiProduct:
 @dataclass
 class AmazonProduct:
     """Result from scraping an Amazon product page (Prime or Fresh)."""
+
     name: str
     product_id: str
     price: Optional[float]
