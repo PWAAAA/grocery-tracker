@@ -13,3 +13,5 @@ __pycache__/
 !LICENSE
 !requirements.txt
 !ruff.toml
+!.github/
+!.github/**
