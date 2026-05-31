@@ -252,11 +252,13 @@ def set_grocery_items(items: list[dict]):
     """Replace all grocery items (full list save)."""
     conn = get_connection()
     conn.execute("DELETE FROM grocery_items")
-    for i, item in enumerate(items):
-        conn.execute(
-            "INSERT INTO grocery_items (value, type, store, position) VALUES (?, ?, ?, ?)",
-            (item["value"], item["type"], item.get("store"), i),
-        )
+    conn.executemany(
+        "INSERT INTO grocery_items (value, type, store, position) VALUES (?, ?, ?, ?)",
+        [
+            (item["value"], item["type"], item.get("store"), i)
+            for i, item in enumerate(items)
+        ],
+    )
     conn.commit()
     conn.close()
 
