@@ -108,7 +108,7 @@ class AldiSession:
                 # Sometimes the session cookie comes from a redirect or
                 # subsequent request — try hitting a product page too
                 log.info("No Instacart cookie yet, trying a product page...")
-                resp2 = self.session.get(
+                self.session.get(
                     "https://www.aldi.us/store/aldi/",
                     timeout=15,
                 )

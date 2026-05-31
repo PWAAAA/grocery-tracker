@@ -12,3 +12,4 @@ __pycache__/
 !README.md
 !LICENSE
 !requirements.txt
+!ruff.toml

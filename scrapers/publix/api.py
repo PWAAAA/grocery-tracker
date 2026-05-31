@@ -11,9 +11,69 @@ from typing import Optional
 
 from . import config
 from .http import PublixSession
-from .parser import savings_item_to_product_dict
+from .parser import savings_item_to_product_dict, eligible_product_to_product_dict
 
 log = logging.getLogger(__name__)
+
+# GraphQL query for fetching eligible products by promo group IDs
+_ELIGIBLE_PRODUCTS_QUERY = """query GetStoreProductsSavingsSearchResultAsync($keyword: String, $skip: Int!, $take: Int!, $facetOverrideStr: String, $facets: String, $sortOrder: String, $ispu: Boolean, $categoryID: String, $minMatch: Int!, $boostVarIndex: Int!, $wildcardSearch: Boolean!, $isPreviewSite: Boolean!, $segmentVarIndex: Int!, $getOrderHistory: Boolean!, $filterQuery: String, $reorderItemCodes: [Int!], $intents: [String!], $searchRetryIndex: Int!, $intentVarIndex: Int!, $boostBuryQuery: String, $source: String, $elevatedProducts: [KeyValuePairOfStringAndStringInput!], $couponId: String, $forceElevation: Boolean, $searchVariation: [KeyValuePairOfStringAndStringInput!], $userCoupon: String) {
+  storeProductsSavingsSearchResult(
+    keyword: $keyword
+    skip: $skip
+    take: $take
+    facetOverrideStr: $facetOverrideStr
+    facets: $facets
+    sortOrder: $sortOrder
+    ispu: $ispu
+    categoryID: $categoryID
+    minMatch: $minMatch
+    boostVarIndex: $boostVarIndex
+    wildcardSearch: $wildcardSearch
+    isPreviewSite: $isPreviewSite
+    segmentVarIndex: $segmentVarIndex
+    getOrderHistory: $getOrderHistory
+    filterQuery: $filterQuery
+    reorderItemCodes: $reorderItemCodes
+    intents: $intents
+    boostBuryQuery: $boostBuryQuery
+    searchRetryIndex: $searchRetryIndex
+    intentVarIndex: $intentVarIndex
+    source: $source
+    elevatedProducts: $elevatedProducts
+    couponId: $couponId
+    forceElevation: $forceElevation
+    searchVariation: $searchVariation
+    userCoupon: $userCoupon
+  ) {
+    storeProducts {
+      baseProductId
+      itemCode
+      title
+      sizeDescription
+      onSale
+      priceLine
+      imageUrls {
+        large {
+          a
+        }
+        small {
+          a
+        }
+      }
+      originalPriceLine
+      promoConditionsMsg
+      promoMsg
+      promoType
+      promoValidThruMsg
+      promoTotalSavings
+      onTpr
+      hasCoupon
+      titleBrand
+    }
+    totalCount
+  }
+}
+"""
 
 
 def _store_base_prices(products: list[dict], store_id: str = None):
@@ -91,6 +151,12 @@ def scrape_search(query: str, zip_code: str = config.DEFAULT_ZIP,
             if c.get("dcId") not in inline_dc_ids:
                 inline_coupons.append(c)
         _attach_coupons_to_products(results, inline_coupons)
+
+    # Also search eligible products from umbrella deals and merge
+    eligible = _search_eligible_products(query, store_id, session, seen_ids)
+    if eligible:
+        results.extend(eligible)
+        log.info(f"Publix: added {len(eligible)} eligible products for '{query}'")
 
     log.info(f"Publix search '{query}': {len(results)} results "
              f"(store {store_id})")
@@ -294,8 +360,17 @@ def _attach_coupons_to_products(products: list[dict], coupon_items: list[dict]):
             product["coupon_min_qty"] = min_qty
             # Compute effective price after coupon if product has a price
             if product.get("price") and min_qty > 0:
-                per_unit_discount = coupon_value / min_qty
-                product["coupon_price"] = round(product["price"] - per_unit_discount, 2)
+                if product.get("is_bogo") and product.get("bogo_price") is not None:
+                    # BOGO + coupon: total = buy × regular_price − coupon_value
+                    deal_info = product.get("deal", {})
+                    buy = deal_info.get("buy_qty", 1)
+                    get_qty = deal_info.get("get_qty", 0)
+                    total_qty = buy + get_qty
+                    total_paid = product["price"] * buy - coupon_value
+                    product["coupon_price"] = round(total_paid / total_qty, 2)
+                else:
+                    per_unit_discount = coupon_value / min_qty
+                    product["coupon_price"] = round(product["price"] - per_unit_discount, 2)
             matched = True
 
         if matched:
@@ -432,6 +507,153 @@ def _search_coupons(query: str, store_id: str, session: PublixSession) -> list[d
             matched.append(item)
 
     return matched
+
+
+def _search_eligible_products(query: str, store_id: str,
+                              session: PublixSession,
+                              seen_ids: set) -> list[dict]:
+    """Search eligible products from umbrella weekly ad deals.
+
+    Fetches the full weekly ad, collects promo group IDs from deals,
+    then queries the GraphQL endpoint to find individual products
+    that match the search query.
+    """
+    # Fetch full weekly ad to get all deals with promo group IDs
+    params = {
+        "smImg": config.SMALL_IMAGE_SIZE,
+        "enImg": config.LARGE_IMAGE_SIZE,
+        "fallbackImg": False,
+        "isMobile": False,
+        "page": 1,
+        "pageSize": 0,
+        "includePersonalizedDeals": False,
+        "languageID": 1,
+        "isWeb": True,
+        "getSavingType": config.SAVING_TYPE_WEEKLY_AD,
+    }
+
+    data = session.get_json(
+        config.SAVINGS_ENDPOINT,
+        params=params,
+        extra_headers={"PublixStore": store_id},
+    )
+
+    if not data:
+        return []
+
+    savings = data.get("Savings", []) if isinstance(data, dict) else data
+
+    # Collect all promo group IDs from deals that have them
+    all_promo_ids = []
+    for item in savings:
+        pgi = item.get("promoGroupIds")
+        if pgi:
+            for pid in pgi.split(","):
+                pid = pid.strip()
+                if pid:
+                    all_promo_ids.append(pid)
+
+    if not all_promo_ids:
+        return []
+
+    # Query GraphQL for eligible products, filtering by search keyword
+    products = _fetch_eligible_products(all_promo_ids, store_id, session,
+                                        keyword=query)
+
+    # Dedup against already-seen product IDs
+    results = []
+    for p in products:
+        pid = p["product_id"]
+        if pid not in seen_ids:
+            seen_ids.add(pid)
+            results.append(p)
+
+    return results
+
+
+def _fetch_eligible_products(promo_group_ids: list[str], store_id: str,
+                             session: PublixSession,
+                             keyword: str = "") -> list[dict]:
+    """Fetch eligible products from the GraphQL endpoint by promo group IDs.
+
+    Args:
+        promo_group_ids: List of promo group ID strings (e.g. ["23601764-0", ...]).
+        store_id: Publix store number.
+        session: PublixSession with established cookies.
+        keyword: Optional keyword to filter results server-side.
+
+    Returns:
+        List of product dicts, or empty list if the endpoint is blocked/fails.
+    """
+    filter_query = "||".join(f"promoGroupId::{pid}" for pid in promo_group_ids)
+
+    body = {
+        "operationName": "GetStoreProductsSavingsSearchResultAsync",
+        "query": _ELIGIBLE_PRODUCTS_QUERY,
+        "variables": {
+            "keyword": keyword,
+            "skip": 0,
+            "take": 1000,
+            "source": "WEB_WEEKLYAD_MODAL",
+            "sortOrder": "salesRank asc",
+            "minMatch": 0,
+            "boostVarIndex": 0,
+            "wildcardSearch": False,
+            "isPreviewSite": False,
+            "segmentVarIndex": 0,
+            "getOrderHistory": False,
+            "intentVarIndex": 1,
+            "searchRetryIndex": 0,
+            "filterQuery": filter_query,
+            "intents": [],
+            "elevatedProducts": [],
+            "searchVariation": [],
+            "forceElevation": False,
+            "boostBuryQuery": "",
+            "reorderItemCodes": None,
+            "userCoupon": None,
+        },
+    }
+
+    # Try search-specific warmup before hitting the GraphQL endpoint
+    session.warmup_search()
+
+    data = session.post_json(
+        config.PRODUCTS_SEARCH_ENDPOINT,
+        json_body=body,
+        extra_headers={"PublixStore": store_id},
+        cache_block=True,
+    )
+
+    if not data:
+        log.warning("Publix eligible products endpoint returned no data "
+                     "(may be Akamai-blocked)")
+        return []
+
+    # Navigate the GraphQL response structure
+    result = data
+    if isinstance(data, dict):
+        result = data.get("data", data)
+        if isinstance(result, dict):
+            result = result.get("storeProductsSavingsSearchResult", result)
+            if isinstance(result, dict):
+                result = result.get("storeProducts", [])
+
+    if not isinstance(result, list):
+        log.warning(f"Unexpected eligible products response format: {type(result)}")
+        return []
+
+    products = []
+    for item in result:
+        try:
+            product = eligible_product_to_product_dict(item)
+            if product["product_id"]:
+                products.append(product)
+        except Exception as e:
+            log.debug(f"Failed to parse eligible product: {e}")
+
+    log.debug(f"Fetched {len(products)} eligible products from GraphQL")
+    return products
 
 
 def _is_weekly_ad_id(product_id: str) -> bool:

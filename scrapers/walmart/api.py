@@ -16,7 +16,7 @@ from urllib.parse import quote_plus
 
 from scrapers.models import WalmartProduct
 from .config import MAX_RETRIES, MIN_DELAY, MAX_DELAY, MAX_SEARCH_PAGES
-from .http import fetch_page, HAS_CFFI
+from .http import fetch_page
 from .parser import extract_next_data, parse_product_page, parse_search_results
 
 log = logging.getLogger(__name__)

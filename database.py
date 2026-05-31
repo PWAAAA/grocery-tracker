@@ -150,6 +150,44 @@ def init_db():
         ON publix_unknown_prices (reason)
     """)
 
+    # Price history: one row per observed price for any store product over time.
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS price_history (
+            id             INTEGER PRIMARY KEY AUTOINCREMENT,
+            product_key    TEXT NOT NULL,
+            store          TEXT NOT NULL,
+            product_id     TEXT,
+            name           TEXT,
+            brand          TEXT,
+            size           TEXT,
+            price          REAL,
+            unit_price     REAL,
+            unit_label     TEXT,
+            std_units_json TEXT,
+            url            TEXT,
+            image_url      TEXT,
+            query          TEXT,
+            zip_code       TEXT,
+            store_id       TEXT,
+            scraped_at     TEXT NOT NULL DEFAULT (datetime('now'))
+        )
+    """)
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_ph_key_time  ON price_history (product_key, scraped_at)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_ph_store_pid ON price_history (store, product_id)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_ph_scraped   ON price_history (scraped_at)")
+
+    # Most recent observation per product, via window function.
+    conn.execute("""
+        CREATE VIEW IF NOT EXISTS latest_prices AS
+        SELECT * FROM (
+            SELECT *, ROW_NUMBER() OVER (
+                PARTITION BY product_key ORDER BY scraped_at DESC
+            ) AS rn
+            FROM price_history
+        )
+        WHERE rn = 1
+    """)
+
     # Migrate existing single-product data from recipe_ingredients to ingredient_products
     try:
         cols = [row[1] for row in conn.execute("PRAGMA table_info(recipe_ingredients)").fetchall()]

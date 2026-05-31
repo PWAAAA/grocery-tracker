@@ -1,0 +1,51 @@
+# Ruff config — baseline lint setup for the grocery scraper.
+# Matches the default rule set (pyflakes + core pycodestyle errors).
+# Run:  ruff check .        (lint)
+#       ruff check . --fix  (apply safe fixes)
+
+# Legacy single-file scripts / browser profiles — not part of the app.
+extend-exclude = ["old"]
+
+[lint]
+# Ruff's default selection, pinned explicitly so the baseline is documented
+# rather than implicit:
+#   E4/E7/E9 — pycodestyle errors (imports, statements, syntax)
+#   F        — pyflakes (unused imports/vars, f-string issues, etc.)
+select = ["E4", "E7", "E9", "F"]
+
+# ---------------------------------------------------------------------------
+# OPTIONAL STRICTER GROUPS (not enabled — add codes to `select` above to turn on)
+# ---------------------------------------------------------------------------
+# Each rule group comes from a former standalone flake8 plugin that ruff has
+# reimplemented. The 1-3 letter "code" is just the prefix ruff prints in front
+# of every finding (e.g. "B006", "C401") so you know which group flagged it.
+# These are OFF by default because they're opinionated and can produce more
+# findings / false positives than the baseline.
+#
+#   "B"   flake8-Bugbear — likely *bugs*, not style. The high-value group.
+#         B006: mutable default arg, e.g. `def f(x, items=[])` — the list is
+#               created once and SHARED across every call (classic footgun).
+#         B902: bare `except:` that swallows everything incl. KeyboardInterrupt.
+#         B007: loop variable assigned but never used in the body.
+#
+#   "UP"  pyUPgrade — rewrites old syntax to the modern equivalent for your
+#         Python version.
+#         UP006: `List[int]` -> `list[int]`  (PEP 585, no more typing imports)
+#         UP015: drops the redundant "r" mode in `open(f, "r")`.
+#         UP032: `"{}".format(x)` -> f-string.
+#
+#   "C4"  flake8-Comprehensions — simplifies needless comprehension/call combos.
+#         C401: `set(x for x in y)`  -> `{x for x in y}`  (set comprehension)
+#         C416: `[x for x in y]`     -> `list(y)`         (the comp does nothing)
+#         C408: `dict(a=1, b=2)`     -> `{"a": 1, "b": 2}`(literal is faster)
+#
+#   "I"   Isort — enforces import ORDER (stdlib, then third-party, then local,
+#         each block alphabetized). Fully auto-fixable with `ruff check --fix`.
+#         I001: imports are unsorted / un-grouped in a block.
+#
+#   "N"   pep8-Naming — naming conventions from PEP 8.
+#         N802: function name should be lower_snake_case.
+#         N806: local variable in a function should be lower_snake_case.
+#         N801: class name should be CapWords/PascalCase.
+#
+# To enable, e.g.:  select = ["E4", "E7", "E9", "F", "B", "I", "UP"]

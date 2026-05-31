@@ -10,9 +10,8 @@ zip code by looking at the Fresh landing page response.
 """
 
 import logging
-from typing import Optional
 
-from .http import fetch_page, HAS_CFFI
+from .http import HAS_CFFI
 
 if HAS_CFFI:
     import curl_cffi.requests as _requests

@@ -40,6 +40,7 @@ from scrapers.amazon import (
 from scrapers.publix import (
     scrape_search as publix_search,
     scrape_product as publix_scrape_product,
+    scrape_weekly_ad as publix_weekly_ad,
     extract_id_from_url as publix_extract_id,
     find_stores_by_zip as publix_find_stores,
     PublixSession,
@@ -56,6 +57,7 @@ from database import (
 )
 from pricing.cooking import compute_ingredient_cost, format_ingredient_cost_breakdown, COOKING_UNITS
 from pricing.serving_size import parse_serving_size_density
+import price_history
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 log = logging.getLogger(__name__)
@@ -297,6 +299,27 @@ def api_search():
                 p["unit_price_string"] = std[default_key]["string"]
     results["unit_meta"] = meta
 
+    # Log observations and attach 30-day price badges. Never let history
+    # bookkeeping break a search.
+    try:
+        store_id = request.args.get("store_id", "").strip() or None
+        price_history.record_observations(
+            all_products, query=q, zip_code=zip_code, store_id=store_id,
+            default_unit_key=default_key,
+        )
+        badges = price_history.get_badges_for_keys(
+            [price_history.product_key(p) for p in all_products]
+        )
+        for p in all_products:
+            b = badges.get(price_history.product_key(p))
+            if b:
+                p["price_low_30d"] = b["low_30d"]
+                p["price_high_30d"] = b["high_30d"]
+                p["price_avg_30d"] = b["avg_30d"]
+                p["is_30d_low"] = b["is_30d_low"]
+    except Exception as e:
+        log.error(f"Price history error: {e}")
+
     return jsonify(results)
 
 
@@ -330,10 +353,10 @@ def api_fetch_links():
     results = []
 
     # Group links by store
-    walmart_links = [l for l in links if "walmart.com" in l]
-    aldi_links = [l for l in links if "aldi.us" in l]
-    amazon_links = [l for l in links if "amazon.com" in l]
-    publix_links = [l for l in links if "publix.com" in l]
+    walmart_links = [link for link in links if "walmart.com" in link]
+    aldi_links = [link for link in links if "aldi.us" in link]
+    amazon_links = [link for link in links if "amazon.com" in link]
+    publix_links = [link for link in links if "publix.com" in link]
 
     # Fetch Walmart products
     for link in walmart_links:
@@ -427,6 +450,14 @@ def api_fetch_links():
             std = p.get("std_units") or {}
             if default_key in std:
                 p["unit_price_string"] = std[default_key]["string"]
+
+    try:
+        price_history.record_observations(
+            results, zip_code=zip_code, store_id=store_id,
+            default_unit_key=default_key,
+        )
+    except Exception as e:
+        log.error(f"Price history error (fetch-links): {e}")
 
     return jsonify({"products": results, "unit_meta": meta})
 
@@ -782,6 +813,43 @@ def api_recipe_recalculate(recipe_id):
 @app.route("/api/cooking-units", methods=["GET"])
 def api_cooking_units():
     return jsonify({"units": COOKING_UNITS})
+
+
+@app.route("/api/price-history", methods=["GET"])
+def api_price_history():
+    """Price-over-time series + summary for one product."""
+    store = request.args.get("store", "").strip()
+    product_id = request.args.get("product_id", "").strip()
+    days = min(max(int(request.args.get("days", 90)), 1), 365)
+    if not store or not product_id:
+        return jsonify({"error": "store and product_id required"}), 400
+    return jsonify(price_history.get_product_history(store, product_id, days=days))
+
+
+@app.route("/api/price-drops", methods=["GET"])
+def api_price_drops():
+    """Products currently at or near their N-day low."""
+    days = min(max(int(request.args.get("days", 30)), 1), 365)
+    limit = min(max(int(request.args.get("limit", 50)), 1), 200)
+    return jsonify({"drops": price_history.get_price_drops(days=days, limit=limit)})
+
+
+@app.route("/api/cheapest", methods=["GET"])
+def api_cheapest():
+    """Store ranking by current price for products matching a name."""
+    name = request.args.get("name", "").strip()
+    if not name:
+        return jsonify({"error": "name required"}), 400
+    return jsonify({"results": price_history.get_cheapest_by_store(name)})
+
+
+@app.route("/api/weekly-ad")
+def api_weekly_ad():
+    zip_code = request.args.get("zip", DEFAULT_ZIP).strip()
+    store_id = request.args.get("publix_store_id", "").strip() or None
+    products = publix_weekly_ad(zip_code=zip_code, store_id=store_id, session=get_publix_session())
+    meta = standardize_unit_prices("weekly ad", products)
+    return jsonify({"products": products, "count": len(products), "unit_meta": meta})
 
 
 @app.route("/api/publix-base-prices", methods=["GET"])

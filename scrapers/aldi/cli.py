@@ -71,7 +71,7 @@ How to find your store ID and zone ID:
         pid = extract_id_from_url(args.url)
         if pid:
             print(f"  Product ID: {pid}")
-            print(f"  Add this to your tracked products list.")
+            print("  Add this to your tracked products list.")
         else:
             print(f"  Could not extract product ID from: {args.url}")
         return

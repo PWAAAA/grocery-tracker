@@ -242,8 +242,14 @@ def compute_unit_reps(
     vol = total_in_dimension(pack, "volume", name_for_order)
     if vol and vol > 0:
         per_floz = price / vol
-    elif native and native[1] in VOLUME_TO_FLOZ:
-        per_floz = native[0] / VOLUME_TO_FLOZ[native[1]]
+
+    # Prefer store's native unit price when it significantly disagrees with
+    # our computed value. The store has actual product data that may differ
+    # from what the name says (e.g. container capacity vs actual fill volume).
+    if native and native[1] in VOLUME_TO_FLOZ:
+        native_per_floz = native[0] / VOLUME_TO_FLOZ[native[1]]
+        if per_floz is None or (native_per_floz > 0 and abs(per_floz - native_per_floz) / native_per_floz > 0.15):
+            per_floz = native_per_floz
     if per_floz:
         out["per_fl_oz"] = {"value": per_floz, "string": _fmt_money_per(per_floz, "fl oz")}
         per_gal = per_floz * 128
@@ -254,8 +260,14 @@ def compute_unit_reps(
     wt = total_in_dimension(pack, "weight", name_for_order)
     if wt and wt > 0:
         per_oz = price / wt
-    elif native and native[1] in WEIGHT_TO_OZ and prod_dim == "weight":
-        per_oz = native[0] / WEIGHT_TO_OZ[native[1]]
+
+    # Prefer store's native unit price when it significantly disagrees with
+    # our computed value. The store has actual product weight data that may
+    # differ from what the name says (e.g. drained weight vs total weight).
+    if native and native[1] in WEIGHT_TO_OZ:
+        native_per_oz = native[0] / WEIGHT_TO_OZ[native[1]]
+        if per_oz is None or (native_per_oz > 0 and abs(per_oz - native_per_oz) / native_per_oz > 0.15):
+            per_oz = native_per_oz
     if per_oz:
         out["per_oz"] = {"value": per_oz, "string": _fmt_money_per(per_oz, "oz")}
         per_lb = per_oz * 16
@@ -286,8 +298,11 @@ def standardize_results(query: str, products: list[dict]) -> dict:
 
     available: set[str] = set()
     for p in products:
+        effective_price = p.get("price")
+        if p.get("is_bogo") and p.get("bogo_price") is not None:
+            effective_price = p["bogo_price"]
         reps = compute_unit_reps(
-            price=p.get("price"),
+            price=effective_price,
             name=p.get("name"),
             size=p.get("size"),
             native_unit_price=p.get("unit_price_string"),

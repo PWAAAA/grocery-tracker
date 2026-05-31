@@ -7,8 +7,14 @@ SAVINGS_SEARCH_ENDPOINT = f"{SAVINGS_ENDPOINT}/search"
 DEAL_DETAIL_ENDPOINT = f"{SAVINGS_ENDPOINT}/weeklyaddealdetail"
 STORE_LOCATOR_ENDPOINT = f"{API_BASE}/v1/storelocation"
 
+# GraphQL endpoint for eligible products (deal detail)
+PRODUCTS_SEARCH_ENDPOINT = "https://services.publix.com/search/api/search/storeproductssavings/"
+
 # Cookie warmup URL (must visit before API calls to get Akamai cookies)
 WARMUP_URL = "https://www.publix.com/savings/weekly-ad"
+
+# Search-specific warmup URL (may acquire Akamai tokens for /search/api/ endpoints)
+SEARCH_WARMUP_URL = "https://www.publix.com/shop"
 
 # Request delays (polite scraping)
 MIN_DELAY = 0.5
