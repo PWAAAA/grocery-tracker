@@ -15,3 +15,5 @@ __pycache__/
 !ruff.toml
 !.github/
 !.github/**
+!price_history.py
+!seed_price_history.py
