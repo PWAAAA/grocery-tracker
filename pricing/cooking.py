@@ -120,6 +120,12 @@ DENSITY_OZ_PER_CUP: dict[str, float] = {
     "dried cranberries": 5.0,
 }
 
+# Last-resort density for ingredients not in the table and without serving-size
+# data (e.g. "minced garlic in olive oil"): assume water, 1 g/mL ≈ 8.345 oz per
+# US cup (~5 g per tsp). Lets volume->weight costing still produce a number; the
+# breakdown flags any cost computed this way as an estimate.
+WATER_DENSITY_OZ_PER_CUP: float = 8.345
+
 # Units that indicate "count" (each)
 COUNT_COOKING_UNITS = {"each", "ea", "whole", "piece", "slice", "clove"}
 
@@ -266,17 +272,20 @@ def compute_ingredient_cost(
             return floz_needed * std["per_fl_oz"]["value"]
 
         # Strategy 2: Product is priced by weight → use density
-        # Priority: serving size label > hardcoded table
+        # Priority: serving size label > hardcoded table > water estimate
         if "per_oz" in std or "per_lb" in std:
-            density = density_override or _find_density(ingredient_name)
-            if density is not None:
-                # Convert cups to oz via density
-                cups = floz_needed / 8.0  # back to cups from fl oz
-                oz_needed = cups * density
-                if "per_oz" in std:
-                    return oz_needed * std["per_oz"]["value"]
-                if "per_lb" in std:
-                    return (oz_needed / 16) * std["per_lb"]["value"]
+            density = (
+                density_override
+                or _find_density(ingredient_name)
+                or WATER_DENSITY_OZ_PER_CUP
+            )
+            # Convert cups to oz via density
+            cups = floz_needed / 8.0  # back to cups from fl oz
+            oz_needed = cups * density
+            if "per_oz" in std:
+                return oz_needed * std["per_oz"]["value"]
+            if "per_lb" in std:
+                return (oz_needed / 16) * std["per_lb"]["value"]
 
         # Strategy 3: treat as fl oz anyway (last resort)
         if "per_gal" in std:
@@ -325,16 +334,23 @@ def format_ingredient_cost_breakdown(
             return f"{recipe_qty:g} {recipe_unit} = {floz:.1f} fl oz x {std['per_fl_oz']['string']} = ${cost:.2f}"
         if "per_oz" in std or "per_lb" in std:
             density = density_override or _find_density(ingredient_name)
-            if density is not None:
-                cups = floz / 8.0
-                oz_needed = cups * density
-                if "per_oz" in std:
-                    cost = oz_needed * std["per_oz"]["value"]
-                    return f"{recipe_qty:g} {recipe_unit} ({oz_needed:.1f} oz by weight) x {std['per_oz']['string']} = ${cost:.2f}"
-                if "per_lb" in std:
-                    lbs = oz_needed / 16
-                    cost = lbs * std["per_lb"]["value"]
-                    return f"{recipe_qty:g} {recipe_unit} ({oz_needed:.1f} oz by weight) x {std['per_lb']['string']} = ${cost:.2f}"
+            estimated = density is None
+            if density is None:
+                density = WATER_DENSITY_OZ_PER_CUP
+            cups = floz / 8.0
+            oz_needed = cups * density
+            weight_label = (
+                f"{oz_needed:.1f} oz est. by water density"
+                if estimated
+                else f"{oz_needed:.1f} oz by weight"
+            )
+            if "per_oz" in std:
+                cost = oz_needed * std["per_oz"]["value"]
+                return f"{recipe_qty:g} {recipe_unit} ({weight_label}) x {std['per_oz']['string']} = ${cost:.2f}"
+            if "per_lb" in std:
+                lbs = oz_needed / 16
+                cost = lbs * std["per_lb"]["value"]
+                return f"{recipe_qty:g} {recipe_unit} ({weight_label}) x {std['per_lb']['string']} = ${cost:.2f}"
 
     if unit == "each" and "per_ea" in std:
         cost = recipe_qty * std["per_ea"]["value"]
