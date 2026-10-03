@@ -9,4 +9,10 @@ Public API (used by app.py):
 from .api import scrape_search, scrape_product, scrape_product_list, extract_id_from_url
 from .stores import find_stores_by_zip
 
-__all__ = ["scrape_search", "scrape_product", "scrape_product_list", "extract_id_from_url", "find_stores_by_zip"]
+__all__ = [
+    "scrape_search",
+    "scrape_product",
+    "scrape_product_list",
+    "extract_id_from_url",
+    "find_stores_by_zip",
+]

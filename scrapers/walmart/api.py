@@ -16,7 +16,7 @@ from urllib.parse import quote_plus
 
 from scrapers.models import WalmartProduct
 from .config import MAX_RETRIES, MIN_DELAY, MAX_DELAY, MAX_SEARCH_PAGES
-from .http import fetch_page, HAS_CFFI
+from .http import fetch_page
 from .parser import extract_next_data, parse_product_page, parse_search_results
 
 log = logging.getLogger(__name__)
@@ -78,32 +78,15 @@ def scrape_product(
     return parse_product_page(data, product_id)
 
 
-def scrape_search(
+def _search_pages(
     query: str,
-    zip_code: str = "32801",
-    store_id: Optional[str] = None,
-    max_retries: int = MAX_RETRIES,
-    limit: int = 40,
+    zip_code: str,
+    store_id: Optional[str],
+    referer: str,
+    max_retries: int,
+    limit: int,
 ) -> list[dict]:
-    """
-    Scrape Walmart search results for a query, fetching multiple pages if needed.
-
-    Args:
-        query:       Search term (e.g., "whole milk gallon").
-        zip_code:    Zip code for location-specific pricing.
-        store_id:    Optional store ID.
-        max_retries: Retry attempts on CAPTCHA (default 3).
-        limit:       Maximum number of results to return.
-
-    Returns:
-        List of product summary dicts with name, product_id, price, url.
-    """
-    log.info(f"Searching Walmart for '{query}' (zip: {zip_code}, limit: {limit})")
-
-    # Simulate arriving from Google — Walmart is less aggressive with
-    # requests that have a search engine referer
-    referer = f"https://www.google.com/search?q={quote_plus(query + ' walmart')}"
-
+    """Run the multi-page search fetch loop once and return deduped results."""
     all_results = []
     seen_ids = set()
 
@@ -115,22 +98,30 @@ def scrape_search(
         log.info(f"Walmart search '{query}': fetching page {page_num}")
 
         html = fetch_page(
-            url, zip_code, store_id,
+            url,
+            zip_code,
+            store_id,
             referer=referer,
             max_retries=max_retries,
         )
         if html is None:
-            log.warning(f"Walmart search '{query}': page {page_num} fetch returned no HTML")
+            log.warning(
+                f"Walmart search '{query}': page {page_num} fetch returned no HTML"
+            )
             break
 
         data = extract_next_data(html)
         if data is None:
-            log.warning(f"Walmart search '{query}': page {page_num} no __NEXT_DATA__ found")
+            log.warning(
+                f"Walmart search '{query}': page {page_num} no __NEXT_DATA__ found"
+            )
             break
 
         page_results = parse_search_results(data)
         if not page_results:
-            log.info(f"Walmart search '{query}': page {page_num} returned 0 results, stopping")
+            log.info(
+                f"Walmart search '{query}': page {page_num} returned 0 results, stopping"
+            )
             break
 
         # Deduplicate across pages (Walmart sometimes repeats sponsored items)
@@ -142,7 +133,9 @@ def scrape_search(
                 all_results.append(product)
                 new_count += 1
 
-        log.info(f"Walmart search '{query}': page {page_num} added {new_count} new results (total: {len(all_results)})")
+        log.info(
+            f"Walmart search '{query}': page {page_num} added {new_count} new results (total: {len(all_results)})"
+        )
 
         if len(all_results) >= limit:
             break
@@ -153,8 +146,68 @@ def scrape_search(
             log.info(f"Waiting {delay:.1f}s before next page...")
             time.sleep(delay)
 
-    log.info(f"Walmart search '{query}': {len(all_results)} total results across pages")
     return all_results
+
+
+def scrape_search(
+    query: str,
+    zip_code: str = "32801",
+    store_id: Optional[str] = None,
+    max_retries: int = MAX_RETRIES,
+    limit: int = 40,
+    location_retries: int = 2,
+) -> list[dict]:
+    """
+    Scrape Walmart search results for a query, fetching multiple pages if needed.
+
+    Walmart intermittently (~1/3 of the time) ignores our injected location
+    cookie and serves a national, shipping-only result set with no
+    pickup-eligible items. Each fetch builds a fresh guest ACID, so simply
+    re-running the search usually re-rolls into a location-resolved set. We
+    retry up to `location_retries` times when a set comes back with zero
+    pickup items.
+
+    Args:
+        query:            Search term (e.g., "whole milk gallon").
+        zip_code:         Zip code for location-specific pricing.
+        store_id:         Optional store ID.
+        max_retries:      Retry attempts on CAPTCHA (default 3).
+        limit:            Maximum number of results to return.
+        location_retries: Extra full-search retries when the result set has
+                          no pickup-eligible items (location not applied).
+
+    Returns:
+        List of product summary dicts with name, product_id, price, url.
+    """
+    log.info(f"Searching Walmart for '{query}' (zip: {zip_code}, limit: {limit})")
+
+    # Simulate arriving from Google — Walmart is less aggressive with
+    # requests that have a search engine referer
+    referer = f"https://www.google.com/search?q={quote_plus(query + ' walmart')}"
+
+    results = _search_pages(query, zip_code, store_id, referer, max_retries, limit)
+
+    attempt = 0
+    while (
+        attempt < location_retries
+        and results
+        and not any(p.get("in_store") for p in results)
+    ):
+        attempt += 1
+        log.warning(
+            f"Walmart search '{query}': {len(results)} results but none "
+            f"pickup-eligible (location not applied); retry {attempt}/{location_retries}"
+        )
+        time.sleep(random.uniform(MIN_DELAY, MAX_DELAY))
+        results = _search_pages(query, zip_code, store_id, referer, max_retries, limit)
+
+    pickup = sum(1 for p in results if p.get("in_store"))
+    log.info(
+        f"Walmart search '{query}': {len(results)} total results "
+        f"({pickup} pickup-eligible) after {attempt} location retr"
+        f"{'y' if attempt == 1 else 'ies'}"
+    )
+    return results
 
 
 def scrape_product_list(
@@ -183,5 +236,5 @@ def extract_id_from_url(url: str) -> Optional[str]:
         https://www.walmart.com/ip/10450114
         walmart.com/ip/Whatever/10450114?some=param
     """
-    match = re.search(r'/ip/(?:[^/]+/)?(\d+)', url)
+    match = re.search(r"/ip/(?:[^/]+/)?(\d+)", url)
     return match.group(1) if match else None

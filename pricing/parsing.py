@@ -17,7 +17,8 @@ _RANGE_RE = re.compile(
     re.IGNORECASE,
 )
 SIZE_RE = re.compile(
-    r"(?<!/)" rf"{_NUM}\s*-?\s*("
+    r"(?<!/)"
+    rf"{_NUM}\s*-?\s*("
     r"fl\.?\s*oz|floz"
     r"|gallons?|gal"
     r"|liters?|litres?|l"
@@ -38,20 +39,50 @@ SIZE_RE = re.compile(
 
 # Map raw match -> normalized canonical unit
 UNIT_ALIASES: dict[str, str] = {
-    "fl oz": "fl oz", "fl. oz": "fl oz", "fl.oz": "fl oz", "floz": "fl oz",
-    "gallon": "gallon", "gallons": "gallon", "gal": "gallon",
-    "liter": "liter", "liters": "liter", "litre": "liter", "litres": "liter", "l": "liter",
-    "milliliter": "ml", "milliliters": "ml", "ml": "ml",
-    "quart": "quart", "quarts": "quart", "qt": "quart",
-    "pint": "pint", "pints": "pint", "pt": "pint",
-    "pound": "pound", "pounds": "pound", "lb": "pound", "lbs": "pound",
-    "kilogram": "kilogram", "kilograms": "kilogram", "kg": "kilogram",
-    "gram": "gram", "grams": "gram", "g": "gram",
-    "ounce": "ounce", "ounces": "ounce", "oz": "ounce",
-    "count": "count", "counts": "count", "ct": "count",
-    "pack": "pack", "packs": "pack", "pk": "pack",
-    "dozen": "dozen", "dz": "dozen",
-    "sheet": "sheet", "sheets": "sheet",
+    "fl oz": "fl oz",
+    "fl. oz": "fl oz",
+    "fl.oz": "fl oz",
+    "floz": "fl oz",
+    "gallon": "gallon",
+    "gallons": "gallon",
+    "gal": "gallon",
+    "liter": "liter",
+    "liters": "liter",
+    "litre": "liter",
+    "litres": "liter",
+    "l": "liter",
+    "milliliter": "ml",
+    "milliliters": "ml",
+    "ml": "ml",
+    "quart": "quart",
+    "quarts": "quart",
+    "qt": "quart",
+    "pint": "pint",
+    "pints": "pint",
+    "pt": "pint",
+    "pound": "pound",
+    "pounds": "pound",
+    "lb": "pound",
+    "lbs": "pound",
+    "kilogram": "kilogram",
+    "kilograms": "kilogram",
+    "kg": "kilogram",
+    "gram": "gram",
+    "grams": "gram",
+    "g": "gram",
+    "ounce": "ounce",
+    "ounces": "ounce",
+    "oz": "ounce",
+    "count": "count",
+    "counts": "count",
+    "ct": "count",
+    "pack": "pack",
+    "packs": "pack",
+    "pk": "pack",
+    "dozen": "dozen",
+    "dz": "dozen",
+    "sheet": "sheet",
+    "sheets": "sheet",
 }
 
 

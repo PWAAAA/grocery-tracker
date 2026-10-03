@@ -15,8 +15,13 @@ from typing import Optional
 
 from scrapers.models import AldiProduct
 from .config import (
-    DEFAULT_SHOP_ID, DEFAULT_ZONE_ID, DEFAULT_ZIP,
-    BATCH_SIZE, MIN_DELAY, MAX_DELAY, DEFAULT_SEARCH_LIMIT,
+    DEFAULT_SHOP_ID,
+    DEFAULT_ZONE_ID,
+    DEFAULT_ZIP,
+    BATCH_SIZE,
+    MIN_DELAY,
+    MAX_DELAY,
+    DEFAULT_SEARCH_LIMIT,
 )
 from .session import AldiSession
 from .parser import parse_item, parse_idp_product
@@ -47,7 +52,7 @@ def scrape_products(
     all_results = []
 
     for i in range(0, len(product_ids), BATCH_SIZE):
-        batch = product_ids[i:i + BATCH_SIZE]
+        batch = product_ids[i : i + BATCH_SIZE]
 
         if i > 0:
             delay = random.uniform(MIN_DELAY, MAX_DELAY)
@@ -58,13 +63,23 @@ def scrape_products(
             data = session.fetch_items_idp(batch, shop_id)
             if data is None:
                 for pid in batch:
-                    all_results.append(AldiProduct(
-                        name="FETCH_ERROR", product_id=pid,
-                        price=None, price_string=None, unit_price_string=None,
-                        size=None, brand=None, in_stock=False, on_sale=False,
-                        sale_disclaimer=None, store_location=None, url="",
-                        error="IDP request failed",
-                    ))
+                    all_results.append(
+                        AldiProduct(
+                            name="FETCH_ERROR",
+                            product_id=pid,
+                            price=None,
+                            price_string=None,
+                            unit_price_string=None,
+                            size=None,
+                            brand=None,
+                            in_stock=False,
+                            on_sale=False,
+                            sale_disclaimer=None,
+                            store_location=None,
+                            url="",
+                            error="IDP request failed",
+                        )
+                    )
                 continue
             for product in data.get("products", []):
                 all_results.append(parse_idp_product(product))
@@ -72,13 +87,23 @@ def scrape_products(
             data = session.fetch_items(batch, shop_id, zone_id, postal_code)
             if data is None:
                 for pid in batch:
-                    all_results.append(AldiProduct(
-                        name="FETCH_ERROR", product_id=pid,
-                        price=None, price_string=None, unit_price_string=None,
-                        size=None, brand=None, in_stock=False, on_sale=False,
-                        sale_disclaimer=None, store_location=None, url="",
-                        error="GraphQL request failed",
-                    ))
+                    all_results.append(
+                        AldiProduct(
+                            name="FETCH_ERROR",
+                            product_id=pid,
+                            price=None,
+                            price_string=None,
+                            unit_price_string=None,
+                            size=None,
+                            brand=None,
+                            in_stock=False,
+                            on_sale=False,
+                            sale_disclaimer=None,
+                            store_location=None,
+                            url="",
+                            error="GraphQL request failed",
+                        )
+                    )
                 continue
             items = data.get("data", {}).get("items", [])
             for item in items:
@@ -103,7 +128,9 @@ def find_products(
     if session is None:
         session = AldiSession()
 
-    product_ids = session.search_product_ids(query, shop_id, zone_id, postal_code, limit)
+    product_ids = session.search_product_ids(
+        query, shop_id, zone_id, postal_code, limit
+    )
     if not product_ids:
         log.info(f"Aldi search '{query}': no product IDs found")
         return []
@@ -123,11 +150,11 @@ def extract_id_from_url(url: str) -> Optional[str]:
         https://www.aldi.us/product/friendly-farms-1-milk-1-gal-0000000000001754
     """
     # Format 1: /products/{id}-{slug}
-    match = re.search(r'/products/(\d+)', url)
+    match = re.search(r"/products/(\d+)", url)
     if match:
         return match.group(1)
     # Format 2: /product/{slug}-{id}  (ID is trailing digits at end of path)
-    match = re.search(r'/product/.*?-(\d{7,})(?:\?|$)', url)
+    match = re.search(r"/product/.*?-(\d{7,})(?:\?|$)", url)
     if match:
         return match.group(1)
     return None

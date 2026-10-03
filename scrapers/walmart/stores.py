@@ -26,7 +26,9 @@ def _get(url: str, timeout: int = 10) -> Optional[str]:
     """Simple GET that returns response text or None."""
     try:
         if HAS_CFFI:
-            resp = cffi_requests.get(url, impersonate="chrome", timeout=timeout, verify=False)
+            resp = cffi_requests.get(
+                url, impersonate="chrome", timeout=timeout, verify=False
+            )
         else:
             resp = cffi_requests.get(url, timeout=timeout, verify=False)
         if resp.status_code != 200:
@@ -34,7 +36,9 @@ def _get(url: str, timeout: int = 10) -> Optional[str]:
             return None
         # Check for CAPTCHA pages
         lower = resp.text[:3000].lower()
-        if any(s in lower for s in ("robot or human", "captcha", "press & hold", "blocked")):
+        if any(
+            s in lower for s in ("robot or human", "captcha", "press & hold", "blocked")
+        ):
             log.warning(f"CAPTCHA detected on {url}")
             return None
         return resp.text
@@ -103,18 +107,20 @@ def _parse_nodes(nodes: list, supercenter_only: bool = True) -> list[dict]:
             continue
 
         address = node.get("address", {})
-        results.append({
-            "id": node.get("id"),
-            "displayName": node.get("displayName", ""),
-            "name": name,
-            "distance": node.get("distance"),
-            "address": {
-                "street": address.get("streetAddress", ""),
-                "city": address.get("city", ""),
-                "state": address.get("state", ""),
-                "zip": address.get("postalCode", ""),
-            },
-        })
+        results.append(
+            {
+                "id": node.get("id"),
+                "displayName": node.get("displayName", ""),
+                "name": name,
+                "distance": node.get("distance"),
+                "address": {
+                    "street": address.get("streetAddress", ""),
+                    "city": address.get("city", ""),
+                    "state": address.get("state", ""),
+                    "zip": address.get("postalCode", ""),
+                },
+            }
+        )
     return results
 
 

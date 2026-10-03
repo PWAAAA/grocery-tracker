@@ -16,8 +16,11 @@ from .constants import (
 from .containers import detect_container_label
 from .dimension import pick_dimension, product_dimension
 from .parsing import (
-    parse_native_per_100, parse_native_unit_price, parse_pack_size_combined,
-    parse_pack_size_with_positions, parse_priced_per_unit,
+    parse_native_per_100,
+    parse_native_unit_price,
+    parse_pack_size_combined,
+    parse_pack_size_with_positions,
+    parse_priced_per_unit,
 )
 
 
@@ -39,8 +42,9 @@ def total_count(pack: list[tuple[float, str]]) -> Optional[float]:
     return qty if has else None
 
 
-def total_in_dimension(pack: list[tuple[float, str]], dimension: str,
-                       name: Optional[str] = None) -> Optional[float]:
+def total_in_dimension(
+    pack: list[tuple[float, str]], dimension: str, name: Optional[str] = None
+) -> Optional[float]:
     """Sum a parsed pack into the canonical unit of the requested dimension.
 
     Multipack handling uses word order from the product name to decide
@@ -170,7 +174,10 @@ def compute_unit_reps(
         elif native and native[1] in VOLUME_TO_FLOZ:
             per_floz = native[0] / VOLUME_TO_FLOZ[native[1]]
             per_gal = per_floz * 128
-            out["per_fl_oz"] = {"value": per_floz, "string": _fmt_money_per(per_floz, "fl oz")}
+            out["per_fl_oz"] = {
+                "value": per_floz,
+                "string": _fmt_money_per(per_floz, "fl oz"),
+            }
             out["per_gal"] = {"value": per_gal, "string": f"${per_gal:.2f}/gal"}
         elif priced_per in WEIGHT_TO_OZ:
             per_oz = price / WEIGHT_TO_OZ[priced_per]
@@ -180,10 +187,16 @@ def compute_unit_reps(
         elif priced_per in VOLUME_TO_FLOZ:
             per_floz = price / VOLUME_TO_FLOZ[priced_per]
             per_gal = per_floz * 128
-            out["per_fl_oz"] = {"value": per_floz, "string": _fmt_money_per(per_floz, "fl oz")}
+            out["per_fl_oz"] = {
+                "value": per_floz,
+                "string": _fmt_money_per(per_floz, "fl oz"),
+            }
             out["per_gal"] = {"value": per_gal, "string": f"${per_gal:.2f}/gal"}
         elif priced_per == "each":
-            out["per_ea"] = {"value": price, "string": f"${price:.2f}/{container_label}"}
+            out["per_ea"] = {
+                "value": price,
+                "string": f"${price:.2f}/{container_label}",
+            }
         return out
 
     pack = parse_pack_size_combined(name, size)
@@ -223,14 +236,20 @@ def compute_unit_reps(
     # --- per 100 ct (sheets, napkins, etc.) ---
     per_100 = parse_native_per_100(native_unit_price)
     if per_100 is not None:
-        out["per_100_ct"] = {"value": per_100, "string": _fmt_money_per(per_100, "100 ct")}
+        out["per_100_ct"] = {
+            "value": per_100,
+            "string": _fmt_money_per(per_100, "100 ct"),
+        }
     elif count and count > 0:
         sheet_qty = sum(q for q, u in pack if u == "sheet")
         if sheet_qty > 0:
             non_sheet_count = total_count([(q, u) for q, u in pack if u != "sheet"])
             total_sheets = sheet_qty * (non_sheet_count or 1)
             per_100_val = price / total_sheets * 100
-            out["per_100_ct"] = {"value": per_100_val, "string": _fmt_money_per(per_100_val, "100 ct")}
+            out["per_100_ct"] = {
+                "value": per_100_val,
+                "string": _fmt_money_per(per_100_val, "100 ct"),
+            }
 
     # --- volume ---
     # Prefer price/size over native unit price to avoid rounding errors
@@ -242,10 +261,22 @@ def compute_unit_reps(
     vol = total_in_dimension(pack, "volume", name_for_order)
     if vol and vol > 0:
         per_floz = price / vol
-    elif native and native[1] in VOLUME_TO_FLOZ:
-        per_floz = native[0] / VOLUME_TO_FLOZ[native[1]]
+
+    # Prefer store's native unit price when it significantly disagrees with
+    # our computed value. The store has actual product data that may differ
+    # from what the name says (e.g. container capacity vs actual fill volume).
+    if native and native[1] in VOLUME_TO_FLOZ:
+        native_per_floz = native[0] / VOLUME_TO_FLOZ[native[1]]
+        if per_floz is None or (
+            native_per_floz > 0
+            and abs(per_floz - native_per_floz) / native_per_floz > 0.15
+        ):
+            per_floz = native_per_floz
     if per_floz:
-        out["per_fl_oz"] = {"value": per_floz, "string": _fmt_money_per(per_floz, "fl oz")}
+        out["per_fl_oz"] = {
+            "value": per_floz,
+            "string": _fmt_money_per(per_floz, "fl oz"),
+        }
         per_gal = per_floz * 128
         out["per_gal"] = {"value": per_gal, "string": f"${per_gal:.2f}/gal"}
 
@@ -254,8 +285,16 @@ def compute_unit_reps(
     wt = total_in_dimension(pack, "weight", name_for_order)
     if wt and wt > 0:
         per_oz = price / wt
-    elif native and native[1] in WEIGHT_TO_OZ and prod_dim == "weight":
-        per_oz = native[0] / WEIGHT_TO_OZ[native[1]]
+
+    # Prefer store's native unit price when it significantly disagrees with
+    # our computed value. The store has actual product weight data that may
+    # differ from what the name says (e.g. drained weight vs total weight).
+    if native and native[1] in WEIGHT_TO_OZ:
+        native_per_oz = native[0] / WEIGHT_TO_OZ[native[1]]
+        if per_oz is None or (
+            native_per_oz > 0 and abs(per_oz - native_per_oz) / native_per_oz > 0.15
+        ):
+            per_oz = native_per_oz
     if per_oz:
         out["per_oz"] = {"value": per_oz, "string": _fmt_money_per(per_oz, "oz")}
         per_lb = per_oz * 16
@@ -279,15 +318,23 @@ def standardize_results(query: str, products: list[dict]) -> dict:
       }
     """
     if not products:
-        return {"unit_default": None, "unit_options": [], "container_label": "ea", "dimension": None}
+        return {
+            "unit_default": None,
+            "unit_options": [],
+            "container_label": "ea",
+            "dimension": None,
+        }
 
     dimension = pick_dimension(query, products)
     container_label = detect_container_label(products)
 
     available: set[str] = set()
     for p in products:
+        effective_price = p.get("price")
+        if p.get("is_bogo") and p.get("bogo_price") is not None:
+            effective_price = p["bogo_price"]
         reps = compute_unit_reps(
-            price=p.get("price"),
+            price=effective_price,
             name=p.get("name"),
             size=p.get("size"),
             native_unit_price=p.get("unit_price_string"),
@@ -301,7 +348,11 @@ def standardize_results(query: str, products: list[dict]) -> dict:
     if default not in available:
         default = next((k for k in UNIT_OPTION_ORDER if k in available), None)
     allowed = DIMENSION_FILTER.get(dimension or "")
-    options = [k for k in UNIT_OPTION_ORDER if k in available and (allowed is None or k in allowed)]
+    options = [
+        k
+        for k in UNIT_OPTION_ORDER
+        if k in available and (allowed is None or k in allowed)
+    ]
 
     return {
         "unit_default": default,

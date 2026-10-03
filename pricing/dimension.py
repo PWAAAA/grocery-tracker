@@ -33,9 +33,7 @@ def query_dimension_hint(query: str) -> Optional[str]:
     return best[1] if best else None
 
 
-def product_dimension(
-    name: Optional[str], size: Optional[str] = None
-) -> Optional[str]:
+def product_dimension(name: Optional[str], size: Optional[str] = None) -> Optional[str]:
     """Pick this product's dimension purely from its own name + size text.
 
     Physical-quantity units (volume, weight) take priority over count when

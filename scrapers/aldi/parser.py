@@ -129,9 +129,16 @@ def parse_idp_product(product: dict) -> AldiProduct:
         return AldiProduct(
             name="PARSE_ERROR",
             product_id=str(product.get("id", "???")),
-            price=None, price_string=None, unit_price_string=None,
-            size=None, brand=None, in_stock=False, on_sale=False,
-            sale_disclaimer=None, store_location=None, url="",
+            price=None,
+            price_string=None,
+            unit_price_string=None,
+            size=None,
+            brand=None,
+            in_stock=False,
+            on_sale=False,
+            sale_disclaimer=None,
+            store_location=None,
+            url="",
             error=str(e),
         )
 
@@ -205,7 +212,9 @@ def parse_item(item: dict) -> AldiProduct:
 
         # --- URL ---
         evergreen = item.get("evergreenUrl", "")
-        url = f"https://www.aldi.us/store/aldi/products/{evergreen}" if evergreen else ""
+        url = (
+            f"https://www.aldi.us/store/aldi/products/{evergreen}" if evergreen else ""
+        )
 
         return AldiProduct(
             name=name,

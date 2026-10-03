@@ -1,0 +1,43 @@
+name: CI
+
+# Phase-1 CI: lint + format check + syntax compile.
+# No test suite exists yet, so this verifies code style and that every
+# module parses. When pytest tests are added, add a "test" job below.
+#
+# Kept dependency-free on purpose: ruff doesn't import the project, and
+# `compileall` only parses syntax — so we skip installing requirements.txt
+# (flask, curl_cffi, libsql-experimental), keeping CI fast and non-flaky.
+
+on:
+  push:
+    branches: [main, WIP]
+  pull_request:
+    branches: [main]
+
+jobs:
+  lint:
+    name: Lint, format & compile
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      # Pinned to match the local dev version so CI and local agree.
+      - name: Install ruff
+        run: pip install ruff==0.15.15
+
+      - name: Lint (ruff check)
+        run: ruff check .
+
+      - name: Format check (ruff format --check)
+        run: ruff format --check .
+
+      # Compile the app source to catch syntax errors. `old/` (legacy
+      # scripts) is excluded to match the lint config.
+      - name: Compile check
+        run: python -m compileall -q app.py database.py pricing scrapers

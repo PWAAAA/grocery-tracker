@@ -46,7 +46,7 @@ def _parse_fraction(s: str) -> Optional[float]:
     except ValueError:
         pass
     # Mixed number: "1 1/2"
-    mixed = re.match(r'^(\d+)\s+(\d+)/(\d+)$', s)
+    mixed = re.match(r"^(\d+)\s+(\d+)/(\d+)$", s)
     if mixed:
         whole = int(mixed.group(1))
         num = int(mixed.group(2))
@@ -55,7 +55,7 @@ def _parse_fraction(s: str) -> Optional[float]:
             return None
         return whole + num / den
     # Simple fraction: "1/4"
-    frac = re.match(r'^(\d+)/(\d+)$', s)
+    frac = re.match(r"^(\d+)/(\d+)$", s)
     if frac:
         num = int(frac.group(1))
         den = int(frac.group(2))
@@ -91,10 +91,10 @@ def parse_serving_size_density(serving_size_str: str) -> Optional[float]:
     # Extract volume portion: optional number + fraction + volume unit
     # Handles: "1/4 cup", "2 tbsp", "1 1/2 cups", "About 1/3 cup"
     vol_pattern = re.compile(
-        r'(?:about\s+)?'                          # optional "About"
-        r'((?:\d+\s+)?\d+(?:/\d+)?(?:\.\d+)?)'   # number (mixed, fraction, or decimal)
-        r'\s*'
-        r'(cups?|tbsp|tablespoons?|tsp|teaspoons?)',  # volume unit
+        r"(?:about\s+)?"  # optional "About"
+        r"((?:\d+\s+)?\d+(?:/\d+)?(?:\.\d+)?)"  # number (mixed, fraction, or decimal)
+        r"\s*"
+        r"(cups?|tbsp|tablespoons?|tsp|teaspoons?)",  # volume unit
         re.IGNORECASE,
     )
     vol_match = vol_pattern.search(text)
@@ -113,7 +113,7 @@ def parse_serving_size_density(serving_size_str: str) -> Optional[float]:
 
     # Extract weight portion in parentheses: "(45g)" or "(1.5 oz)" or "(70 g)"
     weight_pattern = re.compile(
-        r'\(\s*(\d+\.?\d*)\s*(g|oz|grams?|ounces?)\s*\)',
+        r"\(\s*(\d+\.?\d*)\s*(g|oz|grams?|ounces?)\s*\)",
         re.IGNORECASE,
     )
     weight_match = weight_pattern.search(text)
@@ -127,9 +127,9 @@ def parse_serving_size_density(serving_size_str: str) -> Optional[float]:
         return None
 
     # Convert weight to oz
-    if weight_unit.startswith('g'):
+    if weight_unit.startswith("g"):
         weight_oz = weight_amount * GRAMS_TO_OZ
-    elif weight_unit.startswith('o'):
+    elif weight_unit.startswith("o"):
         weight_oz = weight_amount
     else:
         return None

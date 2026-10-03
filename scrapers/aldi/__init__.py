@@ -14,8 +14,12 @@ from .api import find_products, scrape_products, extract_id_from_url
 from .stores import find_stores_by_zip
 
 __all__ = [
-    "DEFAULT_SHOP_ID", "DEFAULT_ZONE_ID", "DEFAULT_ZIP",
+    "DEFAULT_SHOP_ID",
+    "DEFAULT_ZONE_ID",
+    "DEFAULT_ZIP",
     "AldiSession",
-    "find_products", "scrape_products", "extract_id_from_url",
+    "find_products",
+    "scrape_products",
+    "extract_id_from_url",
     "find_stores_by_zip",
 ]

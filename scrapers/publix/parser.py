@@ -190,7 +190,8 @@ def extract_size_from_description(description: Optional[str]) -> Optional[str]:
         r"\s*-?\s*"
         r"(fl\s*oz|oz|ml|[Ll]|lb|gal|ct|pk|qt|pt)"
         r"[^,]*",
-        desc, re.I
+        desc,
+        re.I,
     )
     if m:
         return m.group(0).strip().rstrip(",").strip()
@@ -210,15 +211,9 @@ def _clean_size_string(size: str) -> str:
     The pricing parser would otherwise sum all values, producing wrong unit prices.
     """
     # Strip parenthetical groups containing units (metric or imperial equivalents)
-    cleaned = re.sub(
-        r"\s*\([^)]*(?:oz|lb|g|kg|ml|l)\b[^)]*\)",
-        "", size, flags=re.I
-    )
+    cleaned = re.sub(r"\s*\([^)]*(?:oz|lb|g|kg|ml|l)\b[^)]*\)", "", size, flags=re.I)
     # Also strip trailing bare metric: "28 oz 794 g" -> "28 oz"
-    cleaned = re.sub(
-        r"\s+\d+(?:\.\d+)?\s*(?:g|kg|ml)\b",
-        "", cleaned
-    )
+    cleaned = re.sub(r"\s+\d+(?:\.\d+)?\s*(?:g|kg|ml)\b", "", cleaned)
     return cleaned.strip()
 
 
@@ -243,7 +238,8 @@ def parse_description_stacking(description: Optional[str]) -> dict:
     # "Digital Coupon X.XX off Y = FINAL PRICE WITH Y/TOTAL"
     m = re.search(
         r"Digital\s+Coupon\s+([\d.]+)\s+off\s+(\d+)\s*=\s*FINAL\s+PRICE\s+WITH\s+(\d+)/([\d.]+)",
-        desc, re.I
+        desc,
+        re.I,
     )
     if m:
         coupon_value = float(m.group(1))
@@ -328,7 +324,9 @@ def savings_item_to_product_dict(item: dict) -> dict:
             else:
                 price_string = f"${price:.2f}"
                 if coupon_price is not None:
-                    price_string += f" (w/ coupon on {coupon_min_qty}: ${coupon_price:.2f})"
+                    price_string += (
+                        f" (w/ coupon on {coupon_min_qty}: ${coupon_price:.2f})"
+                    )
                 elif base_price:
                     price_string = f"${price:.2f} (was ${base_price:.2f})"
 
@@ -342,7 +340,9 @@ def savings_item_to_product_dict(item: dict) -> dict:
                 coupon_value = stacking["coupon_value"]
                 coupon_min_qty = stacking["coupon_min_qty"]
                 coupon_price = stacking["final_per_unit"]
-                price_string += f" (w/ coupon on {coupon_min_qty}: ${coupon_price:.2f} ea)"
+                price_string += (
+                    f" (w/ coupon on {coupon_min_qty}: ${coupon_price:.2f} ea)"
+                )
             elif min_purchase > 1:
                 coupon_min_qty = min_purchase
 
@@ -351,13 +351,19 @@ def savings_item_to_product_dict(item: dict) -> dict:
             if max_sav:
                 buy = deal["buy_qty"]
                 get = deal["get_qty"]
-                base_price = max_sav
-                price = max_sav
-                bogo_price = round(max_sav * buy / (buy + get), 2)
+                base_price = round(max_sav / get, 2)
+                price = base_price
+                bogo_price = round(max_sav * buy / (get * (buy + get)), 2)
+                total_qty = buy + get
+                total_paid = round(price * buy, 2)
                 if additional["per_lb"]:
-                    price_string = f"${price:.2f}/lb (BOGO: ${bogo_price:.2f}/lb)"
+                    price_string = (
+                        f"${bogo_price:.2f}/lb (${total_paid:.2f} for {total_qty})"
+                    )
                 else:
-                    price_string = f"${price:.2f} (BOGO: ${bogo_price:.2f})"
+                    price_string = (
+                        f"${bogo_price:.2f}/ea (${total_paid:.2f} for {total_qty})"
+                    )
             else:
                 price_string = clean_html_text(savings_text)
 
@@ -397,20 +403,28 @@ def savings_item_to_product_dict(item: dict) -> dict:
                 coupon_value = stacking["coupon_value"]
                 coupon_min_qty = stacking["coupon_min_qty"]
                 coupon_price = stacking["final_per_unit"]
-                price_string += f" (w/ coupon on {coupon_min_qty}: ${coupon_price:.2f} ea)"
+                price_string += (
+                    f" (w/ coupon on {coupon_min_qty}: ${coupon_price:.2f} ea)"
+                )
 
         elif deal["deal_type"] == "bogo":
             max_sav = additional["max_savings"]
             if max_sav:
                 buy = deal["buy_qty"]
                 get = deal["get_qty"]
-                base_price = max_sav
-                price = max_sav
-                bogo_price = round(max_sav * buy / (buy + get), 2)
+                base_price = round(max_sav / get, 2)
+                price = base_price
+                bogo_price = round(max_sav * buy / (get * (buy + get)), 2)
+                total_qty = buy + get
+                total_paid = round(price * buy, 2)
                 if additional["per_lb"]:
-                    price_string = f"${price:.2f}/lb (BOGO: ${bogo_price:.2f}/lb)"
+                    price_string = (
+                        f"${bogo_price:.2f}/lb (${total_paid:.2f} for {total_qty})"
+                    )
                 else:
-                    price_string = f"${price:.2f} (BOGO: ${bogo_price:.2f})"
+                    price_string = (
+                        f"${bogo_price:.2f}/ea (${total_paid:.2f} for {total_qty})"
+                    )
             else:
                 price_string = clean_html_text(savings_text)
 
@@ -431,16 +445,18 @@ def savings_item_to_product_dict(item: dict) -> dict:
             size = _clean_size_string(size)
 
     # Product ID: use baseProductId (TPR), dcId (coupon), or waId (WeeklyAd)
-    product_id = (item.get("baseProductId")
-                  or str(item.get("dcId", ""))
-                  or str(item.get("waId", item.get("id", ""))))
+    product_id = (
+        item.get("baseProductId")
+        or str(item.get("dcId", ""))
+        or str(item.get("waId", item.get("id", "")))
+    )
 
     # URL for Publix product pages
     if item.get("baseProductId"):
         slug = re.sub(r"[^a-z0-9]+", "-", (title or "").lower()).strip("-")
         url = f"https://www.publix.com/pd/{slug}/{item['baseProductId']}"
     else:
-        url = f"https://www.publix.com/savings/weekly-ad"
+        url = "https://www.publix.com/savings/weekly-ad"
 
     # Image
     image_url = item.get("enhancedImageUrl") or item.get("imageUrl")
@@ -480,4 +496,109 @@ def savings_item_to_product_dict(item: dict) -> dict:
         "coupon_value": coupon_value,
         "coupon_min_qty": coupon_min_qty,
         "coupon_price": coupon_price,
+        # Promo group IDs for eligible product lookups
+        "promo_group_ids": item.get("promoGroupIds") or None,
+    }
+
+
+def eligible_product_to_product_dict(item: dict) -> dict:
+    """Convert a GraphQL eligible product object into a standardized product dict.
+
+    These come from the storeProductsSavingsSearchResult endpoint and include
+    per-product promo details (promoMsg, promoType, promoTotalSavings, etc.).
+    """
+    title = item.get("title", "")
+    brand = item.get("titleBrand")
+    size_raw = item.get("sizeDescription")
+    size = _clean_size_string(size_raw) if size_raw else None
+    product_id = item.get("baseProductId", "")
+
+    # Parse price from priceLine (e.g. "$11.59")
+    price = None
+    price_line = item.get("priceLine", "")
+    m = re.match(r"\$([\d.]+)", price_line)
+    if m:
+        price = float(m.group(1))
+
+    # Parse promo info
+    promo_msg = item.get("promoMsg", "")  # e.g. "Buy 2 Get 2 Free"
+    promo_type = item.get("promoType", "")  # e.g. "BXGY"
+
+    # Build deal from promoMsg
+    deal = (
+        parse_savings_text(promo_msg)
+        if promo_msg
+        else {
+            "deal_type": "other",
+            "sale_price": None,
+            "per_lb": False,
+            "buy_qty": 1,
+            "get_qty": 0,
+            "dollars_off": None,
+            "percent_off": None,
+            "raw": "",
+        }
+    )
+
+    # Compute BOGO pricing
+    base_price = price
+    bogo_price = None
+    price_string = price_line
+    is_bogo = promo_type == "BXGY" or deal["deal_type"] == "bogo"
+
+    if is_bogo and price is not None:
+        buy = deal.get("buy_qty", 1)
+        get = deal.get("get_qty", 0)
+        if buy > 0 and get > 0:
+            total_qty = buy + get
+            total_paid = round(price * buy, 2)
+            bogo_price = round(total_paid / total_qty, 2)
+            price_string = f"${bogo_price:.2f}/ea (${total_paid:.2f} for {total_qty})"
+
+    # Image URL
+    image_urls = item.get("imageUrls") or {}
+    large = image_urls.get("large") or {}
+    image_url = large.get("a")
+
+    # Product URL
+    slug = re.sub(r"[^a-z0-9]+", "-", title.lower()).strip("-")
+    url = (
+        f"https://www.publix.com/pd/{slug}/{product_id}"
+        if product_id
+        else "https://www.publix.com/savings/weekly-ad"
+    )
+
+    return {
+        "name": title,
+        "product_id": product_id,
+        "price": price,
+        "price_string": price_string,
+        "base_price": base_price,
+        "unit_price_string": None,
+        "size": size,
+        "brand": brand,
+        "in_stock": True,
+        "on_sale": True,
+        "url": url,
+        "image": image_url,
+        "image_url": image_url,
+        "store": "publix",
+        "serving_size": None,
+        "sponsored": False,
+        # Deal fields
+        "deal": deal,
+        "bogo_price": bogo_price,
+        "is_bogo": is_bogo,
+        "deal_text": promo_msg,
+        "deal_start": None,
+        "deal_end": None,
+        "department": None,
+        "categories": [],
+        "saving_type": "EligibleProduct",
+        # Coupon fields
+        "coupon_value": None,
+        "coupon_min_qty": None,
+        "coupon_price": None,
+        "has_coupon": item.get("hasCoupon", False),
+        "promo_group_ids": None,
     }

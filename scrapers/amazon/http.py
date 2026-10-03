@@ -18,6 +18,7 @@ from .config import USER_AGENTS, BACKOFF_BASE
 
 try:
     import curl_cffi.requests as cffi_requests
+
     HAS_CFFI = True
 except ImportError:
     HAS_CFFI = False
@@ -30,6 +31,7 @@ log = logging.getLogger(__name__)
 # ────────────────────────────────────────────────────────────
 # Request construction
 # ────────────────────────────────────────────────────────────
+
 
 def _build_headers(referer: Optional[str] = None) -> dict:
     """Build request headers that mimic a real browser."""
@@ -47,15 +49,17 @@ def _build_headers(referer: Optional[str] = None) -> dict:
     }
 
     if not is_firefox:
-        headers.update({
-            "Sec-Ch-Ua": '"Chromium";v="126", "Google Chrome";v="126", "Not-A.Brand";v="8"',
-            "Sec-Ch-Ua-Mobile": "?0",
-            "Sec-Ch-Ua-Platform": '"Windows"',
-            "Sec-Fetch-Dest": "document",
-            "Sec-Fetch-Mode": "navigate",
-            "Sec-Fetch-Site": "cross-site" if referer else "none",
-            "Sec-Fetch-User": "?1",
-        })
+        headers.update(
+            {
+                "Sec-Ch-Ua": '"Chromium";v="126", "Google Chrome";v="126", "Not-A.Brand";v="8"',
+                "Sec-Ch-Ua-Mobile": "?0",
+                "Sec-Ch-Ua-Platform": '"Windows"',
+                "Sec-Fetch-Dest": "document",
+                "Sec-Fetch-Mode": "navigate",
+                "Sec-Fetch-Site": "cross-site" if referer else "none",
+                "Sec-Fetch-User": "?1",
+            }
+        )
 
     if referer:
         headers["Referer"] = referer
@@ -80,6 +84,7 @@ def _build_cookies(zip_code: str) -> dict:
 # Bot detection
 # ────────────────────────────────────────────────────────────
 
+
 def _is_captcha(html: str) -> bool:
     """
     Check if the response is a CAPTCHA / bot challenge page.
@@ -103,6 +108,7 @@ def _is_captcha(html: str) -> bool:
 # ────────────────────────────────────────────────────────────
 # Page fetching with retry
 # ────────────────────────────────────────────────────────────
+
 
 def fetch_page(
     url: str,
@@ -145,7 +151,7 @@ def fetch_page(
 
             if resp.status_code == 503:
                 if attempt < max_retries - 1:
-                    wait = BACKOFF_BASE * (2 ** attempt) + random.uniform(0, 2)
+                    wait = BACKOFF_BASE * (2**attempt) + random.uniform(0, 2)
                     log.warning(
                         f"503 on attempt {attempt + 1}/{max_retries} — "
                         f"retrying in {wait:.1f}s..."
@@ -161,7 +167,7 @@ def fetch_page(
 
             if _is_captcha(resp.text):
                 if attempt < max_retries - 1:
-                    wait = BACKOFF_BASE * (2 ** attempt) + random.uniform(0, 3)
+                    wait = BACKOFF_BASE * (2**attempt) + random.uniform(0, 3)
                     log.warning(
                         f"CAPTCHA on attempt {attempt + 1}/{max_retries} — "
                         f"retrying in {wait:.1f}s..."
@@ -171,8 +177,7 @@ def fetch_page(
                 else:
                     lib = "curl_cffi" if HAS_CFFI else "requests"
                     log.warning(
-                        f"CAPTCHA after {max_retries} attempts for {url} "
-                        f"(using {lib})"
+                        f"CAPTCHA after {max_retries} attempts for {url} (using {lib})"
                     )
                     if not HAS_CFFI:
                         log.warning(
@@ -187,7 +192,7 @@ def fetch_page(
         except Exception as e:
             log.error(f"Request failed for {url}: {e}")
             if attempt < max_retries - 1:
-                time.sleep(BACKOFF_BASE * (2 ** attempt))
+                time.sleep(BACKOFF_BASE * (2**attempt))
                 continue
             return None
 
