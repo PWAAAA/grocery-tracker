@@ -198,12 +198,22 @@ def api_search():
             raw = walmart_search(
                 query=q, zip_code=zip_code, store_id=store_id, limit=limit
             )
-            # Filter out shipping-only products (no in-store pickup)
+            # Filter out shipping-only products (no in-store pickup).
+            # Walmart sometimes serves a degraded national result set with no
+            # pickup badges (location cookie not applied); if filtering would
+            # leave nothing, keep the unfiltered results so we still show items.
             pre_filter = len(raw)
-            raw = [p for p in raw if p.get("in_store", True)]
-            if pre_filter != len(raw):
-                log.info(
-                    f"Walmart '{q}': filtered {pre_filter - len(raw)}/{pre_filter} shipping-only items"
+            in_store_only = [p for p in raw if p.get("in_store", True)]
+            if in_store_only:
+                raw = in_store_only
+                if pre_filter != len(raw):
+                    log.info(
+                        f"Walmart '{q}': filtered {pre_filter - len(raw)}/{pre_filter} shipping-only items"
+                    )
+            elif raw:
+                log.warning(
+                    f"Walmart '{q}': all {pre_filter} items shipping-only "
+                    "(location likely not applied); returning unfiltered"
                 )
             # Sponsored items go last; cap after sorting
             raw.sort(key=lambda p: bool(p.get("sponsored")))
